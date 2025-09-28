@@ -2,9 +2,7 @@ import * as vscode from 'vscode';
 import { UserSettingsManager } from './UserSettingsManager';
 
 export interface SmartCopilotConfig {
-    serviceType: 'local' | 'serverless';
-    localServiceUrl?: string;
-    serverlessUrl?: string;
+    serviceUrl: string;
     apiKey?: string;
 }
 
@@ -44,31 +42,25 @@ export class SmartCopilotService {
     }
 
     private loadConfig(): SmartCopilotConfig {
-        const serviceConfig = UserSettingsManager.getServiceConfig();
+        // Service URL can be configured via environment variable or use default
+        const serviceUrl = process.env.SMART_COPILOT_SERVICE_URL || 'http://127.0.0.1:8000';
+        const apiKey = process.env.SMART_COPILOT_API_KEY;
 
         return {
-            serviceType: serviceConfig.type as 'local' | 'serverless',
-            localServiceUrl: serviceConfig.localUrl,
-            serverlessUrl: serviceConfig.serverlessUrl,
-            apiKey: serviceConfig.apiKey
+            serviceUrl,
+            apiKey
         };
     }
 
-    private getServiceUrl(): string {
-        return this.config.serviceType === 'local'
-            ? this.config.localServiceUrl!
-            : this.config.serverlessUrl!;
-    }
-
     private async makeRequest<T>(endpoint: string, data?: any, method: string = 'GET'): Promise<T> {
-        const url = `${this.getServiceUrl()}${endpoint}`;
+        const url = `${this.config.serviceUrl}${endpoint}`;
 
         const headers: Record<string, string> = {
             'Content-Type': 'application/json'
         };
 
-        // Add authentication headers
-        if (this.config.serviceType === 'serverless' && this.config.apiKey) {
+        // Add authentication headers if API key is provided
+        if (this.config.apiKey) {
             headers['Authorization'] = `Bearer ${this.config.apiKey}`;
         }
 
@@ -85,11 +77,17 @@ export class SmartCopilotService {
         }
 
         try {
-            const response = await fetch(url, {
+            const requestOptions: RequestInit = {
                 method: method,
-                headers,
-                body: data ? JSON.stringify(data) : undefined
-            });
+                headers
+            };
+
+            // Only include body for methods that support it
+            if (data && method !== 'GET' && method !== 'HEAD') {
+                requestOptions.body = JSON.stringify(data);
+            }
+
+            const response = await fetch(url, requestOptions);
 
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -106,7 +104,8 @@ export class SmartCopilotService {
         try {
             const response = await this.makeRequest<{ results: SimilarCase[] }>(
                 '/api/search/similar-cases',
-                { query, limit }
+                { query, limit },
+                'POST'
             );
             return response.results;
         } catch (error) {
@@ -119,7 +118,8 @@ export class SmartCopilotService {
         try {
             return await this.makeRequest<ErrorContext>(
                 '/api/process/error-context',
-                { context }
+                { context },
+                'POST'
             );
         } catch (error) {
             console.error('Error processing error context:', error);
@@ -131,7 +131,8 @@ export class SmartCopilotService {
         try {
             const response = await this.makeRequest<{ enhanced_prompt: string }>(
                 '/api/enhance/prompt',
-                { prompt, context }
+                { prompt, context },
+                'POST'
             );
             return response.enhanced_prompt;
         } catch (error) {
@@ -144,7 +145,8 @@ export class SmartCopilotService {
         try {
             const response = await this.makeRequest<{ prompts: any[] }>(
                 '/api/prompts/search',
-                { query, category_id: type, limit }
+                { query, category_id: type, limit },
+                'POST'
             );
             return response.prompts;
         } catch (error) {
@@ -157,7 +159,8 @@ export class SmartCopilotService {
         try {
             const response = await this.makeRequest<{ events: any[] }>(
                 '/api/team/events',
-                { team_id: teamId, limit }
+                { team_id: teamId, limit },
+                'POST'
             );
             return response.events;
         } catch (error) {
@@ -187,6 +190,60 @@ export class SmartCopilotService {
             return response.categories;
         } catch (error) {
             console.error('Error getting categories:', error);
+            return [];
+        }
+    }
+
+    async getTeams(): Promise<any[]> {
+        try {
+            const response = await this.makeRequest<{ teams: any[] }>(
+                '/api/teams'
+            );
+            return response.teams;
+        } catch (error) {
+            console.error('Error getting teams:', error);
+            return [];
+        }
+    }
+
+    async getDeployEvents(teamId: number, limit: number = 50): Promise<any[]> {
+        try {
+            const response = await this.makeRequest<{ events: any[] }>(
+                '/api/team/deploy-events',
+                { team_id: teamId, limit },
+                'POST'
+            );
+            return response.events;
+        } catch (error) {
+            console.error('Error getting deploy events:', error);
+            return [];
+        }
+    }
+
+    async getTestEvents(teamId: number, limit: number = 50): Promise<any[]> {
+        try {
+            const response = await this.makeRequest<{ events: any[] }>(
+                '/api/team/test-events',
+                { team_id: teamId, limit },
+                'POST'
+            );
+            return response.events;
+        } catch (error) {
+            console.error('Error getting test events:', error);
+            return [];
+        }
+    }
+
+    async getFailureEvents(teamId: number, limit: number = 50): Promise<any[]> {
+        try {
+            const response = await this.makeRequest<{ events: any[] }>(
+                '/api/team/failure-events',
+                { team_id: teamId, limit },
+                'POST'
+            );
+            return response.events;
+        } catch (error) {
+            console.error('Error getting failure events:', error);
             return [];
         }
     }

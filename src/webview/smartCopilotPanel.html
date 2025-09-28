@@ -300,16 +300,6 @@
 
 <body>
     <div class="container">
-        <!-- Configuration Section -->
-        <div id="configSection" class="section">
-            <div class="section-title">⚙️ Configuration</div>
-            <div class="config-info">
-                <div><strong>User ID:</strong> <span id="userId">Not configured</span></div>
-                <div><strong>Team ID:</strong> <span id="teamId">Not configured</span></div>
-                <div><strong>Prompt Search:</strong> <span id="promptSearchEnabled">Disabled</span></div>
-            </div>
-        </div>
-
         <!-- Prompt Search Section -->
         <div id="promptSearchSection" class="section">
             <div class="section-title">🔍 Smart Prompt Search</div>
@@ -325,18 +315,6 @@
                 <div class="button-group">
                     <button id="sendToCopilot">Send to Copilot Chat</button>
                     <button id="clearSelection" class="secondary-button">Clear Selection</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Cache Management Section -->
-        <div id="cacheSection" class="section">
-            <div class="section-title">💾 Cache Management</div>
-            <div class="cache-info">
-                <div id="cacheStatus" class="cache-status">Loading cache info...</div>
-                <div class="button-group">
-                    <button id="updateCache" class="secondary-button">Update Cache</button>
-                    <button id="clearCache" class="danger-button">Clear Cache</button>
                 </div>
             </div>
         </div>
@@ -362,6 +340,31 @@
                 </table>
                 <div id="noEventsMessage" class="hidden">
                     <p>No team events available. Make sure you have configured your team ID and enabled team events.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cache Management Section -->
+        <div id="cacheSection" class="section">
+            <div class="section-title">💾 Cache Management</div>
+            <div class="cache-info">
+                <div id="cacheStatus" class="cache-status">Loading cache info...</div>
+                <div class="button-group">
+                    <button id="updateCache" class="secondary-button">Update Cache</button>
+                    <button id="clearCache" class="danger-button">Clear Cache</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Configuration Section -->
+        <div id="configSection" class="section">
+            <div class="section-title">⚙️ Configuration</div>
+            <div class="config-info">
+                <div><strong>User ID:</strong> <span id="userId">Not configured</span></div>
+                <div><strong>Team ID:</strong> <span id="teamId">Not configured</span></div>
+                <div><strong>Prompt Search:</strong> <span id="promptSearchEnabled">Disabled</span></div>
+                <div class="button-group">
+                    <button id="openSettings" class="secondary-button">Open User Settings</button>
                 </div>
             </div>
         </div>
@@ -408,6 +411,7 @@
             syncCacheButton.addEventListener('click', handleSyncCache);
             updateCacheButton.addEventListener('click', handleUpdateCache);
             clearCacheButton.addEventListener('click', handleClearCache);
+            document.getElementById('openSettings').addEventListener('click', handleOpenSettings);
 
             function handleSearchInput() {
                 clearTimeout(searchTimeout);
@@ -475,6 +479,10 @@
 
             function handleClearCache() {
                 vscode.postMessage({ type: 'clearCache' });
+            }
+
+            function handleOpenSettings() {
+                vscode.postMessage({ type: 'openSettings' });
             }
 
             function selectPrompt(prompt) {

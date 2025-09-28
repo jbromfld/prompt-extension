@@ -1,10 +1,11 @@
 import { DatabaseService, TeamEvent } from './DatabaseService';
-import { SampleDataService } from './SampleDataService';
+import { SmartCopilotService } from './SmartCopilotService';
 import * as vscode from 'vscode';
 
 export class TeamEventService {
     constructor(
-        private databaseService: DatabaseService
+        private databaseService: DatabaseService,
+        private smartCopilotService: SmartCopilotService
     ) { }
 
     async getTeamEvents(teamId: string): Promise<TeamEvent[]> {
@@ -13,14 +14,12 @@ export class TeamEventService {
             try {
                 return await this.databaseService.getTeamEvents(teamId);
             } catch (dbError) {
-                console.log('Database not available, using sample data');
-                // Fallback to sample data
-                return SampleDataService.getTeamEvents(teamId);
+                console.log('Database not available, trying smart copilot service');
+                return await this.smartCopilotService.getTeamEvents(teamId);
             }
         } catch (error) {
             console.error('Error getting team events:', error);
-            // Fallback to sample data
-            return SampleDataService.getTeamEvents(teamId);
+            return [];
         }
     }
 

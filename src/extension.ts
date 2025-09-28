@@ -33,16 +33,8 @@ export async function activate(context: vscode.ExtensionContext) {
 
     // Initialize services
     const databaseService = new DatabaseService(context);
-    const teamEventService = new TeamEventService(databaseService);
+    const teamEventService = new TeamEventService(databaseService, smartCopilotService);
     const promptSearchService = new PromptSearchService(databaseService, smartCopilotService);
-
-    // Initialize UI
-    const panel = new SmartCopilotPanel(
-      context,
-      promptSearchService,
-      teamEventService,
-      smartCopilotService
-    );
 
     // Create status bar item
     const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
@@ -54,7 +46,7 @@ export async function activate(context: vscode.ExtensionContext) {
     // Register commands
     const openPanelCommand = vscode.commands.registerCommand(
       'smartCopilot.openPanel',
-      () => panel.show()
+      () => SmartCopilotPanel.createOrShow(context.extensionUri, promptSearchService, teamEventService)
     );
 
     const syncCacheCommand = vscode.commands.registerCommand(

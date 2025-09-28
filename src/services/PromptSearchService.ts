@@ -1,18 +1,19 @@
 import { DatabaseService, PromptTemplate, PromptCategory } from './DatabaseService';
-import { SampleDataService } from './SampleDataService';
-import { LocalCacheService } from './LocalCacheService';
 import { SmartCopilotService } from './SmartCopilotService';
+import { LocalCacheService } from './LocalCacheService';
 import * as vscode from 'vscode';
 
 export class PromptSearchService {
     private localCache: LocalCacheService;
+    private smartCopilotService: SmartCopilotService;
     private cacheInitialized: boolean = false;
 
     constructor(
         private databaseService: DatabaseService,
-        private smartCopilotService: SmartCopilotService
+        smartCopilotService: SmartCopilotService
     ) {
         this.localCache = new LocalCacheService();
+        this.smartCopilotService = smartCopilotService;
     }
 
     async getCategories(): Promise<PromptCategory[]> {
@@ -33,50 +34,43 @@ export class PromptSearchService {
                 this.updateLocalCacheInBackground();
                 return categories;
             } catch (apiError) {
-                console.log('API service not available, using sample data');
-                // Fallback to sample data
-                const sampleCategories = SampleDataService.getCategories();
-                // Cache sample data for future use
-                this.localCache.updateCache(sampleCategories, SampleDataService.getAllPrompts()).catch(console.error);
-                return sampleCategories;
+                console.log('API service not available, returning empty categories');
+                return [];
             }
         } catch (error) {
             console.error('Error getting categories:', error);
-            // Fallback to sample data
-            return SampleDataService.getCategories();
+            return [];
         }
     }
 
-    async searchPrompts(query: string, categoryId?: string): Promise<PromptTemplate[]> {
+    async searchPrompts(query: string, categoryId?: number): Promise<PromptTemplate[]> {
         try {
             // Try local cache first for instant autocomplete
             if (await this.localCache.isCacheValid()) {
-                const localResults = await this.localCache.searchPromptsLocally(query, categoryId);
+                const localResults = await this.localCache.searchPromptsLocally(query, categoryId?.toString());
                 if (localResults.length > 0) {
                     console.log(`Found ${localResults.length} prompts from local cache`);
-                    return localResults;
+                    return await this.enrichPromptsWithCategories(localResults);
                 }
             }
 
             // Try API service for fresh results
             try {
-                const results = await this.smartCopilotService.searchPrompts(query, categoryId);
+                const results = await this.smartCopilotService.searchPrompts(query, categoryId?.toString());
                 // Update local cache in background
                 this.updateLocalCacheInBackground();
                 return results;
             } catch (apiError) {
-                console.log('API service not available, using sample data');
-                // Fallback to sample data
-                return SampleDataService.searchPrompts(query, categoryId);
+                console.log('API service not available, returning empty results');
+                return [];
             }
         } catch (error) {
             console.error('Error searching prompts:', error);
-            // Fallback to sample data
-            return SampleDataService.searchPrompts(query, categoryId);
+            return [];
         }
     }
 
-    async getPromptsByCategory(categoryId: string): Promise<PromptTemplate[]> {
+    async getPromptsByCategory(categoryId: number): Promise<PromptTemplate[]> {
         try {
             // Try local cache first
             if (await this.localCache.isCacheValid()) {
@@ -94,14 +88,12 @@ export class PromptSearchService {
                 this.updateLocalCacheInBackground();
                 return prompts;
             } catch (dbError) {
-                console.log('Database not available, using sample data');
-                // Fallback to sample data
-                return SampleDataService.getPromptsByCategory(categoryId);
+                console.log('Database not available, returning empty results');
+                return [];
             }
         } catch (error) {
             console.error('Error getting prompts by category:', error);
-            // Fallback to sample data
-            return SampleDataService.getPromptsByCategory(categoryId);
+            return [];
         }
     }
 
@@ -145,18 +137,10 @@ export class PromptSearchService {
 
                 console.log(`Cache updated: ${categories.length} categories, ${allPrompts.length} prompts`);
             } catch (apiError) {
-                console.log('API service not available, using sample data for cache');
-                const sampleCategories = SampleDataService.getCategories();
-                const samplePrompts = SampleDataService.getAllPrompts();
-                await this.localCache.updateCache(sampleCategories, samplePrompts);
-                console.log(`Cache updated with sample data: ${sampleCategories.length} categories, ${samplePrompts.length} prompts`);
+                console.log('API service not available, skipping cache update');
             }
         } catch (error) {
             console.error('Failed to update cache:', error);
-            // Fallback to sample data
-            const sampleCategories = SampleDataService.getCategories();
-            const samplePrompts = SampleDataService.getAllPrompts();
-            await this.localCache.updateCache(sampleCategories, samplePrompts);
             throw error;
         }
     }
@@ -232,6 +216,38 @@ export class PromptSearchService {
             console.error('Background cache update failed:', error);
         } finally {
             this.cacheInitialized = false;
+        }
+    }
+
+    /**
+     * Enrich prompts with category information
+     */
+    private async enrichPromptsWithCategories(prompts: PromptTemplate[]): Promise<PromptTemplate[]> {
+        try {
+            const categories = await this.getCategories();
+            const categoryMap = new Map(categories.map(cat => [cat.id, cat]));
+
+            return prompts.map(prompt => ({
+                ...prompt,
+                category: categoryMap.get(prompt.category_id) || {
+                    id: prompt.category_id,
+                    name: 'Unknown',
+                    display_name: 'Unknown',
+                    icon: '📁'
+                }
+            }));
+        } catch (error) {
+            console.error('Error enriching prompts with categories:', error);
+            // Return prompts with default category info
+            return prompts.map(prompt => ({
+                ...prompt,
+                category: {
+                    id: prompt.category_id,
+                    name: 'Unknown',
+                    display_name: 'Unknown',
+                    icon: '📁'
+                }
+            }));
         }
     }
 }

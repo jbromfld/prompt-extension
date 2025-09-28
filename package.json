@@ -51,30 +51,6 @@
           "type": "number",
           "default": 24,
           "description": "Maximum cache age in hours before auto-update"
-        },
-        "smartCopilot.service.type": {
-          "type": "string",
-          "enum": [
-            "local",
-            "serverless"
-          ],
-          "default": "local",
-          "description": "Service type: local Python service or hosted endpoint"
-        },
-        "smartCopilot.service.localUrl": {
-          "type": "string",
-          "default": "http://127.0.0.1:8000",
-          "description": "Local service URL (if running locally)"
-        },
-        "smartCopilot.service.serverlessUrl": {
-          "type": "string",
-          "default": "",
-          "description": "Hosted service URL (if using hosted service)"
-        },
-        "smartCopilot.service.apiKey": {
-          "type": "string",
-          "default": "",
-          "description": "API key for hosted service (if using serverless)"
         }
       }
     },

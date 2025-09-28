@@ -12,7 +12,7 @@ export class UserSettingsManager {
    */
   static getUserSettings(): UserSettings {
     const config = vscode.workspace.getConfiguration('smartCopilot');
-    
+
     return {
       userId: config.get<string>('user.id', ''),
       teamId: config.get<string>('user.teamId', ''),
@@ -44,19 +44,6 @@ export class UserSettingsManager {
     return !!(settings.userId && settings.personalAccessToken);
   }
 
-  /**
-   * Get service configuration
-   */
-  static getServiceConfig() {
-    const config = vscode.workspace.getConfiguration('smartCopilot');
-    
-    return {
-      type: config.get<string>('service.type', 'local'),
-      localUrl: config.get<string>('service.localUrl', 'http://127.0.0.1:8000'),
-      serverlessUrl: config.get<string>('service.serverlessUrl', ''),
-      apiKey: config.get<string>('service.apiKey', '') || undefined
-    };
-  }
 
   /**
    * Show configuration status to user
@@ -65,14 +52,14 @@ export class UserSettingsManager {
     const hasBasic = this.hasBasicConfiguration();
     const hasTeam = this.hasTeamConfiguration();
     const hasEnhanced = this.hasEnhancedConfiguration();
-    
+
     const status = [
       `Basic Features: ${hasBasic ? '✅ Configured' : '❌ Not configured'}`,
       `Team Features: ${hasTeam ? '✅ Configured' : '❌ Not configured'}`,
       `Enhanced Features: ${hasEnhanced ? '✅ Configured' : '❌ Not configured'}`
     ].join('\n');
 
-    const message = hasBasic 
+    const message = hasBasic
       ? `Smart Copilot Configuration:\n\n${status}`
       : `Smart Copilot needs configuration!\n\n${status}\n\nPlease configure your user ID in VS Code settings.`;
 
@@ -103,7 +90,9 @@ To get started:
 4. Optionally add Team ID for collaboration
 5. Optionally add Personal Access Token for enhanced features
 
-The extension works without any configuration, but some features will be limited.`;
+The extension works without any configuration, but some features will be limited.
+
+Note: Service connection settings are managed by the smart-copilot-service itself.`;
 
     vscode.window.showInformationMessage(message, 'Open Settings')
       .then(selection => {

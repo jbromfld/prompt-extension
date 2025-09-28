@@ -206,14 +206,15 @@ export class LocalCacheService {
     /**
      * Fast local search for autocomplete
      */
-    async searchPromptsLocally(query: string, categoryId?: string): Promise<PromptTemplate[]> {
+    async searchPromptsLocally(query: string, categoryId?: string | number): Promise<PromptTemplate[]> {
         try {
             const allPrompts = await this.loadPrompts();
             let filteredPrompts = allPrompts;
 
             // Filter by category if specified
             if (categoryId && categoryId !== '') {
-                filteredPrompts = filteredPrompts.filter(prompt => prompt.category_id === categoryId);
+                const categoryIdNum = typeof categoryId === 'string' ? parseInt(categoryId, 10) : categoryId;
+                filteredPrompts = filteredPrompts.filter(prompt => prompt.category_id === categoryIdNum);
             }
 
             // Fast text search

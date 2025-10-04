@@ -61,7 +61,7 @@ export class SmartCopilotPanel {
                     await this.handleSelectPrompt(data);
                     break;
                 case 'sendToCopilot':
-                    await this.handleSendToCopilot(data.prompt);
+                    await this.handleSendToCopilotSimple(data.prompt);
                     break;
                 case 'loadTeamEvents':
                     await this.handleLoadTeamEvents();
@@ -190,6 +190,33 @@ export class SmartCopilotPanel {
         } catch (error) {
             console.error('Error selecting prompt:', error);
             vscode.window.showErrorMessage(`Error selecting prompt: ${error}`);
+        }
+    }
+
+    private async handleSendToCopilotSimple(prompt: string) {
+        try {
+            // Use the available chat command that we know works
+            try {
+                await vscode.commands.executeCommand('workbench.action.chat.sendToNewChat', prompt);
+                vscode.window.showInformationMessage('✅ Prompt sent to Copilot Chat!');
+                console.log('Successfully sent prompt to Copilot using workbench.action.chat.sendToNewChat');
+            } catch (error) {
+                console.log('workbench.action.chat.sendToNewChat failed:', error);
+
+                // Fallback: Copy to clipboard and show instructions
+                await vscode.env.clipboard.writeText(prompt);
+                vscode.window.showInformationMessage(
+                    `Prompt copied to clipboard! Please paste it into the Copilot chat.`,
+                    'Open Copilot Chat'
+                ).then(selection => {
+                    if (selection === 'Open Copilot Chat') {
+                        vscode.commands.executeCommand('workbench.action.chat.open');
+                    }
+                });
+            }
+        } catch (error) {
+            console.error('Error sending prompt to Copilot:', error);
+            vscode.window.showErrorMessage(`Failed to send prompt to Copilot: ${error}`);
         }
     }
 

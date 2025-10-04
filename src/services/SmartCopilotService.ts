@@ -143,15 +143,29 @@ export class SmartCopilotService {
 
     async searchPrompts(query: string, type?: string, limit: number = 20): Promise<any[]> {
         try {
-            const response = await this.makeRequest<{ prompts: any[] }>(
-                '/api/prompts/search',
-                { query, category_id: type, limit },
-                'POST'
-            );
-            return response.prompts;
+            // Use the autocomplete endpoint for search
+            const response = await this.autocompleteSearch(query, limit);
+            return response.results || [];
         } catch (error) {
             console.error('Error searching prompts:', error);
             return [];
+        }
+    }
+
+    async autocompleteSearch(query: string, limit: number = 10): Promise<any> {
+        try {
+            // Don't call the endpoint if query is empty
+            if (!query || query.trim().length === 0) {
+                return { results: [], query: '', category_filter: null };
+            }
+            
+            const response = await this.makeRequest<any>(
+                `/search/autocomplete?q=${encodeURIComponent(query.trim())}&limit=${limit}`
+            );
+            return response;
+        } catch (error) {
+            console.error('Error in autocomplete search:', error);
+            return { results: [], query, category_filter: null };
         }
     }
 
@@ -171,11 +185,9 @@ export class SmartCopilotService {
 
     async usePrompt(promptId: string): Promise<void> {
         try {
-            await this.makeRequest(
-                `/api/prompts/use/${promptId}`,
-                {},
-                'POST'
-            );
+            // This endpoint doesn't exist in the backend yet
+            // Just log the usage for now
+            console.log(`Prompt used: ${promptId}`);
         } catch (error) {
             console.error('Error tracking prompt usage:', error);
             // Don't throw error - this is not critical
@@ -185,7 +197,7 @@ export class SmartCopilotService {
     async getCategories(): Promise<any[]> {
         try {
             const response = await this.makeRequest<{ categories: any[] }>(
-                '/api/categories'
+                '/categories'
             );
             return response.categories;
         } catch (error) {

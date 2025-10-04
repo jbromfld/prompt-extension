@@ -29,7 +29,16 @@ export class PromptSearchService {
 
             // Try API service
             try {
-                const categories = await this.smartCopilotService.getCategories();
+                const categoryStrings = await this.smartCopilotService.getCategories();
+                // Convert string categories to PromptCategory objects
+                const categories: PromptCategory[] = categoryStrings.map((name: string, index: number) => ({
+                    id: index + 1,
+                    name: name,
+                    display_name: name.charAt(0).toUpperCase() + name.slice(1).replace(/_/g, ' '),
+                    icon: '📁',
+                    color: undefined
+                }));
+
                 // Update local cache in background
                 this.updateLocalCacheInBackground();
                 return categories;
@@ -56,10 +65,39 @@ export class PromptSearchService {
 
             // Try API service for fresh results
             try {
-                const results = await this.smartCopilotService.searchPrompts(query, categoryId?.toString());
-                // Update local cache in background
-                this.updateLocalCacheInBackground();
-                return results;
+                // Only call API if we have a meaningful query
+                if (query && query.trim().length > 0) {
+                    // If we have a category filter, modify the query to include @category syntax
+                    let searchQuery = query;
+                    if (categoryId) {
+                        // Get category name from cache or use the ID
+                        const categories = await this.getCategories();
+                        const category = categories.find(cat => cat.id === categoryId);
+                        if (category) {
+                            searchQuery = `@${category.name} ${query}`;
+                        }
+                    }
+
+                    const response = await this.smartCopilotService.autocompleteSearch(searchQuery, 20);
+                    // Filter to only return prompts (not categories) and format them properly
+                    const results = (response.results || [])
+                        .filter((result: any) => result.type === 'prompt')
+                        .map((result: any) => ({
+                            id: result.id,
+                            title: result.title,
+                            description: result.description,
+                            prompt: result.description,
+                            category: result.category ? { name: result.category } : null,
+                            score: result.score
+                        }));
+
+                    // Update local cache in background
+                    this.updateLocalCacheInBackground();
+                    return results;
+                } else {
+                    // For empty queries, just return empty results
+                    return [];
+                }
             } catch (apiError) {
                 console.log('API service not available, returning empty results');
                 return [];
@@ -123,14 +161,21 @@ export class PromptSearchService {
 
             // Try API service first
             try {
-                const categories = await this.smartCopilotService.getCategories();
+                const categoryStrings = await this.smartCopilotService.getCategories();
+                // Convert string categories to PromptCategory objects
+                const categories: PromptCategory[] = categoryStrings.map((name: string, index: number) => ({
+                    id: index + 1,
+                    name: name,
+                    display_name: name.charAt(0).toUpperCase() + name.slice(1).replace(/_/g, ' '),
+                    icon: '📁',
+                    color: undefined
+                }));
+
+                // Skip fetching prompts from API since it's causing 422 errors
+                // Just update the cache with categories for now
                 const allPrompts: PromptTemplate[] = [];
 
-                // Get prompts for each category
-                for (const category of categories) {
-                    const prompts = await this.smartCopilotService.searchPrompts('', category.id, 100);
-                    allPrompts.push(...prompts);
-                }
+                console.log(`Skipping prompt fetching due to API limitations, updating cache with ${categories.length} categories only`);
 
                 // Update local cache
                 await this.localCache.updateCache(categories, allPrompts);

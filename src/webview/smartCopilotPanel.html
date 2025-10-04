@@ -121,6 +121,129 @@
             margin-top: 10px;
         }
 
+        .message-area {
+            margin-top: 12px;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .message-area.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .message-area.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .message-area.info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .prompt-rating-section {
+            margin-top: 20px;
+            padding: 16px;
+            background-color: var(--vscode-editor-background);
+            border: 1px solid var(--vscode-panel-border);
+            border-radius: 6px;
+        }
+
+        .rated-prompt {
+            margin: 12px 0;
+            padding: 12px;
+            background-color: var(--vscode-input-background);
+            border: 1px solid var(--vscode-input-border);
+            border-radius: 4px;
+            font-family: var(--vscode-editor-font-family);
+            font-size: var(--vscode-editor-font-size);
+            white-space: pre-wrap;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .rating-container {
+            margin: 16px 0;
+            text-align: center;
+        }
+
+        .stars {
+            display: flex;
+            justify-content: center;
+            gap: 4px;
+            margin-bottom: 8px;
+        }
+
+        .star {
+            font-size: 24px;
+            color: #ddd;
+            cursor: pointer;
+            transition: color 0.2s;
+            user-select: none;
+        }
+
+        .star:hover,
+        .star.active {
+            color: #ffc107;
+        }
+
+        .star:hover ~ .star {
+            color: #ddd;
+        }
+
+        .rating-text {
+            font-size: 14px;
+            color: var(--vscode-foreground);
+            margin-top: 8px;
+        }
+
+        .rating-actions {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            margin-top: 16px;
+        }
+
+        .primary-button {
+            background-color: var(--vscode-button-background);
+            color: var(--vscode-button-foreground);
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .primary-button:hover {
+            background-color: var(--vscode-button-hoverBackground);
+        }
+
+        .primary-button:disabled {
+            background-color: var(--vscode-button-secondaryBackground);
+            color: var(--vscode-button-secondaryForeground);
+            cursor: not-allowed;
+        }
+
+        .secondary-button {
+            background-color: var(--vscode-button-secondaryBackground);
+            color: var(--vscode-button-secondaryForeground);
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .secondary-button:hover {
+            background-color: var(--vscode-button-secondaryHoverBackground);
+        }
+
         button {
             background-color: var(--vscode-button-background);
             color: var(--vscode-button-foreground);
@@ -312,10 +435,31 @@
                 </div>
                 <div id="autocompleteList" class="autocomplete-list hidden"></div>
                 <div id="selectedPrompts" class="selected-prompts"></div>
-                <div class="button-group">
-                    <button id="sendToCopilot">Send to Copilot Chat</button>
-                    <button id="clearSelection" class="secondary-button">Clear Selection</button>
-                </div>
+               <div class="button-group">
+                   <button id="sendToCopilot">Send to Copilot Chat</button>
+                   <button id="clearSelection" class="secondary-button">Clear Selection</button>
+               </div>
+               <div id="messageArea" class="message-area hidden"></div>
+               
+               <!-- Prompt Rating Section -->
+               <div id="promptRatingSection" class="prompt-rating-section hidden">
+                   <div class="section-title">⭐ Rate this prompt</div>
+                   <div id="ratedPrompt" class="rated-prompt"></div>
+                   <div class="rating-container">
+                       <div class="stars">
+                           <span class="star" data-rating="1">★</span>
+                           <span class="star" data-rating="2">★</span>
+                           <span class="star" data-rating="3">★</span>
+                           <span class="star" data-rating="4">★</span>
+                           <span class="star" data-rating="5">★</span>
+                       </div>
+                       <div id="ratingText" class="rating-text">Click a star to rate</div>
+                   </div>
+                   <div class="rating-actions">
+                       <button id="submitRating" class="primary-button" disabled>Submit Rating</button>
+                       <button id="skipRating" class="secondary-button">Skip</button>
+                   </div>
+               </div>
             </div>
         </div>
 
@@ -386,7 +530,14 @@
             const eventsTable = document.getElementById('eventsTable');
             const updateCacheButton = document.getElementById('updateCache');
             const clearCacheButton = document.getElementById('clearCache');
-            const cacheStatus = document.getElementById('cacheStatus');
+               const cacheStatus = document.getElementById('cacheStatus');
+               const messageArea = document.getElementById('messageArea');
+               const promptRatingSection = document.getElementById('promptRatingSection');
+               const ratedPrompt = document.getElementById('ratedPrompt');
+               const stars = document.querySelectorAll('.star');
+               const ratingText = document.getElementById('ratingText');
+               const submitRatingButton = document.getElementById('submitRating');
+               const skipRatingButton = document.getElementById('skipRating');
 
             // Configuration display elements
             const userIdSpan = document.getElementById('userId');
@@ -395,8 +546,11 @@
 
             let searchTimeout;
             let prompts = [];
+            let allPrompts = []; // Store all prompts for the selected category
             let events = [];
             let selectedPromptList = [];
+            let currentRatingPrompt = null; // Store the prompt being rated
+            let selectedRating = 0; // Current selected rating
 
             // Event listeners
             promptSearchInput.addEventListener('input', handleSearchInput);
@@ -405,7 +559,7 @@
                 // Delay hiding to allow clicks on autocomplete items
                 setTimeout(() => autocompleteList.classList.add('hidden'), 200);
             });
-            categoryFilter.addEventListener('change', handleSearchInput);
+            categoryFilter.addEventListener('change', handleCategoryChange);
             sendToCopilotButton.addEventListener('click', handleSendToCopilot);
             clearSelectionButton.addEventListener('click', handleClearSelection);
             syncCacheButton.addEventListener('click', handleSyncCache);
@@ -413,13 +567,26 @@
             clearCacheButton.addEventListener('click', handleClearCache);
             document.getElementById('openSettings').addEventListener('click', handleOpenSettings);
 
+            // Rating system event listeners
+            stars.forEach(star => {
+                star.addEventListener('click', () => handleStarClick(parseInt(star.dataset.rating)));
+                star.addEventListener('mouseenter', () => highlightStars(parseInt(star.dataset.rating)));
+            });
+            
+            submitRatingButton.addEventListener('click', handleSubmitRating);
+            skipRatingButton.addEventListener('click', handleSkipRating);
+
             function handleSearchInput() {
                 clearTimeout(searchTimeout);
                 searchTimeout = setTimeout(() => {
                     const query = promptSearchInput.value.trim();
                     const categoryId = categoryFilter.value;
 
-                    if (query.length >= 1) {
+                    // If we have all prompts loaded for this category, filter locally
+                    if (allPrompts.length > 0 && categoryId) {
+                        filterPromptsLocally(query);
+                    } else if (query.length >= 1) {
+                        // Otherwise, use API search
                         vscode.postMessage({
                             type: 'searchPrompts',
                             query: query,
@@ -433,21 +600,168 @@
 
             function handleSendToCopilot() {
                 if (selectedPromptList.length === 0) {
-                    vscode.window.showWarningMessage('Please select at least one prompt');
+                    showMessage('Please select at least one prompt', 'error');
                     return;
                 }
 
                 const combinedPrompt = selectedPromptList.map(p => p.prompt).join('\n\n---\n\n');
+                const firstPrompt = selectedPromptList[0]; // Use first prompt for rating
 
                 vscode.postMessage({
                     type: 'sendToCopilot',
-                    prompt: combinedPrompt
+                    prompt: combinedPrompt,
+                    ratingPrompt: firstPrompt // Include the prompt for rating
                 });
             }
 
             function handleClearSelection() {
                 selectedPromptList = [];
                 renderSelectedPrompts();
+            }
+
+            function showMessage(message, type = 'info') {
+                messageArea.textContent = message;
+                messageArea.className = `message-area ${type}`;
+                messageArea.classList.remove('hidden');
+
+                // Auto-hide after 5 seconds
+                setTimeout(() => {
+                    messageArea.classList.add('hidden');
+                }, 5000);
+            }
+
+               function resetPanel() {
+                   // Clear search input
+                   promptSearchInput.value = '';
+                   
+                   // Reset category filter
+                   categoryFilter.value = '';
+                   
+                   // Clear selected prompts
+                   selectedPromptList = [];
+                   renderSelectedPrompts();
+                   
+                   // Clear all prompts and hide autocomplete
+                   allPrompts = [];
+                   prompts = [];
+                   autocompleteList.classList.add('hidden');
+                   
+                   // Hide message area
+                   messageArea.classList.add('hidden');
+                   
+                   console.log('Panel reset completed');
+               }
+
+               function showRatingPrompt(prompt) {
+                   currentRatingPrompt = prompt;
+                   selectedRating = 0;
+                   
+                   // Show the prompt text
+                   ratedPrompt.textContent = prompt.prompt || prompt.description;
+                   
+                   // Reset stars
+                   stars.forEach(star => star.classList.remove('active'));
+                   ratingText.textContent = 'Click a star to rate';
+                   submitRatingButton.disabled = true;
+                   
+                   // Show rating section
+                   promptRatingSection.classList.remove('hidden');
+                   
+                   console.log('Showing rating prompt:', prompt.title);
+               }
+
+               function handleStarClick(rating) {
+                   selectedRating = rating;
+                   highlightStars(rating);
+                   ratingText.textContent = getRatingText(rating);
+                   submitRatingButton.disabled = false;
+                   
+                   console.log('Selected rating:', rating);
+               }
+
+               function highlightStars(rating) {
+                   stars.forEach((star, index) => {
+                       if (index < rating) {
+                           star.classList.add('active');
+                       } else {
+                           star.classList.remove('active');
+                       }
+                   });
+               }
+
+               function getRatingText(rating) {
+                   const texts = {
+                       1: 'Poor - Not helpful',
+                       2: 'Fair - Somewhat helpful',
+                       3: 'Good - Helpful',
+                       4: 'Very Good - Very helpful',
+                       5: 'Excellent - Extremely helpful'
+                   };
+                   return texts[rating] || 'Click a star to rate';
+               }
+
+               function handleSubmitRating() {
+                   if (selectedRating > 0 && currentRatingPrompt) {
+                       // Send rating to backend
+                       vscode.postMessage({
+                           type: 'submitRating',
+                           promptId: currentRatingPrompt.id,
+                           rating: selectedRating,
+                           prompt: currentRatingPrompt
+                       });
+                       
+                       showMessage(`Thank you for rating this prompt ${selectedRating} star${selectedRating > 1 ? 's' : ''}!`, 'success');
+                       
+                       // Hide rating section
+                       promptRatingSection.classList.add('hidden');
+                       currentRatingPrompt = null;
+                       selectedRating = 0;
+                       
+                       console.log('Rating submitted:', selectedRating);
+                   }
+               }
+
+               function handleSkipRating() {
+                   // Hide rating section without submitting
+                   promptRatingSection.classList.add('hidden');
+                   currentRatingPrompt = null;
+                   selectedRating = 0;
+                   
+                   showMessage('Rating skipped', 'info');
+                   console.log('Rating skipped');
+               }
+
+            function filterPromptsLocally(query) {
+                if (!query || query.length === 0) {
+                    // Show all prompts for this category
+                    renderPrompts(allPrompts);
+                } else {
+                    // Filter prompts by query
+                    const filtered = allPrompts.filter(prompt => {
+                        const searchText = `${prompt.title} ${prompt.description || prompt.prompt}`.toLowerCase();
+                        return searchText.includes(query.toLowerCase());
+                    });
+                    renderPrompts(filtered);
+                }
+            }
+
+            function handleCategoryChange() {
+                const categoryId = categoryFilter.value;
+                const query = promptSearchInput.value.trim();
+
+                if (categoryId) {
+                    // Load all prompts for this category
+                    vscode.postMessage({
+                        type: 'loadCategoryPrompts',
+                        categoryId: categoryId
+                    });
+                    // Clear search input to show all prompts
+                    promptSearchInput.value = '';
+                } else {
+                    // Clear all prompts when "All Categories" is selected
+                    allPrompts = [];
+                    autocompleteList.classList.add('hidden');
+                }
             }
 
             function handleSyncCache() {
@@ -541,8 +855,11 @@
                 });
             }
 
-            function renderPrompts(promptsData) {
+            function renderPrompts(promptsData, isCategoryLoad = false) {
                 prompts = promptsData;
+                if (isCategoryLoad) {
+                    allPrompts = promptsData; // Store all prompts for local filtering
+                }
                 autocompleteList.innerHTML = '';
 
                 if (prompts.length === 0) {
@@ -627,8 +944,24 @@
                         renderPrompts(message.prompts);
                         break;
 
+                    case 'categoryPromptsLoaded':
+                        renderPrompts(message.prompts, true); // isCategoryLoad = true
+                        break;
+
                     case 'teamEventsLoaded':
                         renderEvents(message.events);
+                        break;
+
+                    case 'showMessage':
+                        showMessage(message.message, message.messageType || 'info');
+                        break;
+
+                    case 'resetPanel':
+                        resetPanel();
+                        break;
+
+                    case 'showRatingPrompt':
+                        showRatingPrompt(message.prompt);
                         break;
 
                     case 'cacheInfoLoaded':

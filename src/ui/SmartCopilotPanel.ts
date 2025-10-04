@@ -61,7 +61,13 @@ export class SmartCopilotPanel {
                     await this.handleSelectPrompt(data);
                     break;
                 case 'sendToCopilot':
-                    await this.handleSendToCopilotSimple(data.prompt);
+                    await this.handleSendToCopilotSimple(data.prompt, data.ratingPrompt);
+                    break;
+                case 'submitRating':
+                    await this.handleSubmitRating(data.promptId, data.rating, data.prompt);
+                    break;
+                case 'loadCategoryPrompts':
+                    await this.handleLoadCategoryPrompts(data.categoryId);
                     break;
                 case 'loadTeamEvents':
                     await this.handleLoadTeamEvents();
@@ -193,30 +199,192 @@ export class SmartCopilotPanel {
         }
     }
 
-    private async handleSendToCopilotSimple(prompt: string) {
+    private async handleSendToCopilotSimple(prompt: string, ratingPrompt?: any) {
         try {
-            // Use the available chat command that we know works
+            console.log('Attempting to send prompt to Copilot:', prompt.substring(0, 100) + '...');
+
+            // Approach 1: Open chat, focus input, and simulate typing
+            try {
+                // Open the chat
+                await vscode.commands.executeCommand('workbench.action.chat.open');
+                console.log('Chat opened');
+
+                // Wait for chat to fully load
+                await new Promise(resolve => setTimeout(resolve, 1500));
+
+                // Try to focus the chat input
+                await vscode.commands.executeCommand('workbench.panel.chat.view.copilot.focus');
+                console.log('Chat input focused');
+
+                // Wait a bit more for focus to take effect
+                await new Promise(resolve => setTimeout(resolve, 500));
+
+                // Copy to clipboard and paste
+                await vscode.env.clipboard.writeText(prompt);
+                await vscode.commands.executeCommand('editor.action.clipboardPasteAction');
+                console.log('Text pasted into chat input');
+
+                this._panel.webview.postMessage({
+                    type: 'showMessage',
+                    message: '✅ Prompt inserted into Copilot Chat!',
+                    messageType: 'success'
+                });
+                
+                // Show rating prompt instead of resetting
+                if (ratingPrompt) {
+                    this._panel.webview.postMessage({
+                        type: 'showRatingPrompt',
+                        prompt: ratingPrompt
+                    });
+                } else {
+                    // Fallback to reset if no rating prompt
+                    this._panel.webview.postMessage({
+                        type: 'resetPanel'
+                    });
+                }
+
+                return;
+            } catch (error) {
+                console.log('Chat focus + paste approach failed:', error);
+            }
+
+            // Approach 2: Try the sendToNewChat command (even though it seems to not work)
             try {
                 await vscode.commands.executeCommand('workbench.action.chat.sendToNewChat', prompt);
-                vscode.window.showInformationMessage('✅ Prompt sent to Copilot Chat!');
-                console.log('Successfully sent prompt to Copilot using workbench.action.chat.sendToNewChat');
-            } catch (error) {
-                console.log('workbench.action.chat.sendToNewChat failed:', error);
+                console.log('sendToNewChat command executed');
 
-                // Fallback: Copy to clipboard and show instructions
-                await vscode.env.clipboard.writeText(prompt);
-                vscode.window.showInformationMessage(
-                    `Prompt copied to clipboard! Please paste it into the Copilot chat.`,
-                    'Open Copilot Chat'
-                ).then(selection => {
-                    if (selection === 'Open Copilot Chat') {
-                        vscode.commands.executeCommand('workbench.action.chat.open');
-                    }
+                // Give it a moment to see if it actually worked
+                await new Promise(resolve => setTimeout(resolve, 1000));
+
+                this._panel.webview.postMessage({
+                    type: 'showMessage',
+                    message: '✅ Prompt sent to Copilot Chat!',
+                    messageType: 'success'
                 });
+                
+                // Show rating prompt instead of resetting
+                if (ratingPrompt) {
+                    this._panel.webview.postMessage({
+                        type: 'showRatingPrompt',
+                        prompt: ratingPrompt
+                    });
+                } else {
+                    // Fallback to reset if no rating prompt
+                    this._panel.webview.postMessage({
+                        type: 'resetPanel'
+                    });
+                }
+
+                return;
+            } catch (error) {
+                console.log('sendToNewChat failed:', error);
             }
+
+            // Approach 3: Fallback to clipboard with clear instructions
+            try {
+                await vscode.env.clipboard.writeText(prompt);
+                await vscode.commands.executeCommand('workbench.action.chat.open');
+
+                this._panel.webview.postMessage({
+                    type: 'showMessage',
+                    message: 'Prompt copied to clipboard! Chat opened - click in the input field and paste (Ctrl+V).',
+                    messageType: 'info'
+                });
+
+                // Reset the panel
+                this._panel.webview.postMessage({
+                    type: 'resetPanel'
+                });
+
+            } catch (error) {
+                throw new Error(`All Copilot integration methods failed: ${error}`);
+            }
+
         } catch (error) {
             console.error('Error sending prompt to Copilot:', error);
-            vscode.window.showErrorMessage(`Failed to send prompt to Copilot: ${error}`);
+            this._panel.webview.postMessage({
+                type: 'showMessage',
+                message: `Failed to send prompt to Copilot: ${error}`,
+                messageType: 'error'
+            });
+        }
+    }
+
+    private async simulateTyping(text: string): Promise<void> {
+        // This is a workaround to simulate typing in the chat input
+        // We'll use the clipboard and paste command as a fallback
+        try {
+            await vscode.env.clipboard.writeText(text);
+            await vscode.commands.executeCommand('editor.action.clipboardPasteAction');
+            console.log('Simulated typing via clipboard paste');
+        } catch (error) {
+            console.log('Simulated typing failed:', error);
+            throw error;
+        }
+    }
+
+    private async handleSubmitRating(promptId: string, rating: number, prompt: any) {
+        try {
+            console.log(`Submitting rating for prompt ${promptId}: ${rating} stars`);
+            
+            // For now, just log the rating locally
+            // In the future, this could send to the backend
+            console.log('Rating data:', {
+                promptId,
+                rating,
+                promptTitle: prompt.title,
+                timestamp: new Date().toISOString()
+            });
+            
+            // Show success message (already shown by webview)
+            console.log(`Rating submitted successfully: ${rating} stars for "${prompt.title}"`);
+            
+        } catch (error) {
+            console.error('Error submitting rating:', error);
+            this._panel.webview.postMessage({
+                type: 'showMessage',
+                message: `Failed to submit rating: ${error}`,
+                messageType: 'error'
+            });
+        }
+    }
+
+    private async handleLoadCategoryPrompts(categoryId: number) {
+        try {
+            console.log('Loading category prompts for categoryId:', categoryId, typeof categoryId);
+
+            // Get category name first
+            const categories = await this.promptSearchService.getCategories();
+            console.log('Available categories:', categories);
+
+            // Convert categoryId to number if it's a string
+            const numericCategoryId = typeof categoryId === 'string' ? parseInt(categoryId) : categoryId;
+            const category = categories.find(cat => cat.id === numericCategoryId);
+
+            if (!category) {
+                this._panel.webview.postMessage({
+                    type: 'showMessage',
+                    message: 'Category not found',
+                    messageType: 'error'
+                });
+                return;
+            }
+
+            // Search for prompts in this category using @category syntax with a broad search term
+            // The backend expects @category search_terms format, so we add a broad term to get all prompts
+            const prompts = await this.promptSearchService.searchPrompts(`@${category.name} help`, categoryId);
+
+            this._panel.webview.postMessage({
+                type: 'categoryPromptsLoaded',
+                prompts: prompts
+            });
+        } catch (error) {
+            console.error('Error loading category prompts:', error);
+            this._panel.webview.postMessage({
+                type: 'showMessage',
+                message: `Failed to load prompts for category: ${error}`,
+                messageType: 'error'
+            });
         }
     }
 

@@ -222,7 +222,21 @@ export class LocalCacheService {
                 const searchTerm = query.toLowerCase();
                 filteredPrompts = filteredPrompts.filter(prompt => {
                     const promptText = prompt.prompt.toLowerCase();
-                    const variables = prompt.variables?.join(' ').toLowerCase() || '';
+
+                    // Handle variables as either array or JSON string
+                    let variables = '';
+                    if (prompt.variables) {
+                        if (Array.isArray(prompt.variables)) {
+                            variables = prompt.variables.join(' ').toLowerCase();
+                        } else if (typeof prompt.variables === 'string') {
+                            try {
+                                const parsed = JSON.parse(prompt.variables);
+                                variables = Array.isArray(parsed) ? parsed.join(' ').toLowerCase() : '';
+                            } catch (e) {
+                                variables = prompt.variables.toLowerCase();
+                            }
+                        }
+                    }
 
                     return promptText.includes(searchTerm) ||
                         variables.includes(searchTerm) ||

@@ -15,7 +15,12 @@ export class TeamEventService {
                 return await this.databaseService.getTeamEvents(teamId);
             } catch (dbError) {
                 console.log('Database not available, trying smart copilot service');
-                return await this.smartCopilotService.getTeamEvents(teamId);
+                try {
+                    return await this.smartCopilotService.getTeamEvents(teamId);
+                } catch (serviceError) {
+                    console.log('Smart copilot service not available or database not connected');
+                    return [];
+                }
             }
         } catch (error) {
             console.error('Error getting team events:', error);

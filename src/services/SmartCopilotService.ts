@@ -90,7 +90,16 @@ export class SmartCopilotService {
             const response = await fetch(url, requestOptions);
 
             if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+                try {
+                    const errorData = await response.json();
+                    if (errorData.detail) {
+                        errorMessage += ` - ${errorData.detail}`;
+                    }
+                } catch (e) {
+                    // Ignore JSON parsing errors
+                }
+                throw new Error(errorMessage);
             }
 
             return await response.json();
@@ -141,11 +150,17 @@ export class SmartCopilotService {
         }
     }
 
-    async searchPrompts(query: string, type?: string, limit: number = 20): Promise<any[]> {
+    async searchPrompts(query: string, type?: string | number, limit: number = 20): Promise<any[]> {
         try {
+            // Only include category_id if it's a valid number
+            const requestData: any = { query, limit };
+            if (type !== undefined && type !== null && !isNaN(Number(type))) {
+                requestData.category_id = Number(type);
+            }
+
             const response = await this.makeRequest<{ prompts: any[] }>(
                 '/api/prompts/search',
-                { query, category_id: type, limit },
+                requestData,
                 'POST'
             );
             return response.prompts;
@@ -185,12 +200,24 @@ export class SmartCopilotService {
     async getCategories(): Promise<any[]> {
         try {
             const response = await this.makeRequest<{ categories: any[] }>(
-                '/api/categories'
+                '/categories'
             );
             return response.categories;
         } catch (error) {
             console.error('Error getting categories:', error);
             return [];
+        }
+    }
+
+    async autocompleteSearch(query: string, limit: number = 10): Promise<any> {
+        try {
+            const response = await this.makeRequest<any>(
+                `/search/autocomplete?q=${encodeURIComponent(query)}&limit=${limit}`
+            );
+            return response;
+        } catch (error) {
+            console.error('Error in autocomplete search:', error);
+            return { results: [], query, category_filter: null };
         }
     }
 

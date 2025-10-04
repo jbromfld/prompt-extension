@@ -25,7 +25,8 @@
         "smartCopilot.user.teamId": {
           "type": "string",
           "default": "",
-          "description": "Your team ID for collaboration features (optional)"
+          "description": "Your team identifier for collaboration features (e.g., team-dev-2024)",
+          "markdownDescription": "Your team identifier for collaboration features (e.g., team-dev-2024)"
         },
         "smartCopilot.user.personalAccessToken": {
           "type": "string",
@@ -51,6 +52,16 @@
           "type": "number",
           "default": 24,
           "description": "Maximum cache age in hours before auto-update"
+        },
+        "smartCopilot.service.url": {
+          "type": "string",
+          "default": "http://localhost:8000",
+          "description": "Smart Copilot Service URL"
+        },
+        "smartCopilot.service.token": {
+          "type": "string",
+          "default": "",
+          "description": "Service authentication token (optional)"
         }
       }
     },
@@ -108,11 +119,10 @@
   },
   "devDependencies": {
     "@types/node": "16.x",
-    "@types/pg": "^8.10.0",
     "@types/vscode": "^1.74.0",
     "typescript": "^4.9.4"
   },
   "dependencies": {
-    "pg": "^8.11.0"
+    "axios": "^1.6.0"
   }
 }

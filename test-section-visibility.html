@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Test Section Visibility</title>
+    <style>
+        .section {
+            margin: 10px 0;
+            padding: 10px;
+            border: 1px solid #ccc;
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Section Visibility Test</h1>
+
+    <div id="promptSearchSection" class="section">
+        <h3>🔍 Smart Prompt Search</h3>
+        <p>This section should be hidden when promptSearchEnabled is false</p>
+    </div>
+
+    <div id="teamEventsSection" class="section">
+        <h3>📊 Team Events</h3>
+        <p>This section should be hidden when teamEventsEnabled is false</p>
+    </div>
+
+    <button onclick="testBothEnabled()">Both Enabled</button>
+    <button onclick="testBothDisabled()">Both Disabled</button>
+    <button onclick="testPromptOnly()">Prompt Only</button>
+    <button onclick="testTeamOnly()">Team Only</button>
+
+    <script>
+        function updateConfig(config) {
+            // Show/hide prompt search section based on setting
+            const promptSearchSection = document.getElementById('promptSearchSection');
+            if (promptSearchSection) {
+                promptSearchSection.style.display = config.promptSearchEnabled ? 'block' : 'none';
+            }
+
+            // Show/hide team events section based on setting
+            const teamEventsSection = document.getElementById('teamEventsSection');
+            if (teamEventsSection) {
+                teamEventsSection.style.display = config.teamEventsEnabled ? 'block' : 'none';
+            }
+        }
+
+        function testBothEnabled() {
+            updateConfig({ promptSearchEnabled: true, teamEventsEnabled: true });
+            console.log('Both sections should be visible');
+        }
+
+        function testBothDisabled() {
+            updateConfig({ promptSearchEnabled: false, teamEventsEnabled: false });
+            console.log('Both sections should be hidden');
+        }
+
+        function testPromptOnly() {
+            updateConfig({ promptSearchEnabled: true, teamEventsEnabled: false });
+            console.log('Only prompt search should be visible');
+        }
+
+        function testTeamOnly() {
+            updateConfig({ promptSearchEnabled: false, teamEventsEnabled: true });
+            console.log('Only team events should be visible');
+        }
+
+        // Initial test - both disabled
+        updateConfig({ promptSearchEnabled: false, teamEventsEnabled: false });
+    </script>
+</body>
+
+</html>

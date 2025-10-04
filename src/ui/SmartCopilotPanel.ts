@@ -43,6 +43,23 @@ export class SmartCopilotPanel {
 
         this._update();
         this._panel.onDidDispose(() => this.dispose(), null);
+
+
+
+        // Listen for configuration changes
+        vscode.workspace.onDidChangeConfiguration(e => {
+            if (e.affectsConfiguration('smartCopilot')) {
+                console.log('🔧 Configuration changed, recreating panel...');
+
+                // Close and recreate the panel to ensure settings are properly applied
+                this.dispose();
+
+                // Recreate the panel with updated settings
+                setTimeout(() => {
+                    SmartCopilotPanel.createOrShow(this._extensionUri, this.promptSearchService, this.teamEventService);
+                }, 100);
+            }
+        });
     }
 
     private async _update() {
@@ -98,6 +115,9 @@ export class SmartCopilotPanel {
             }
         });
 
+        // Load categories
+        await this.handleGetCategories();
+
         // Load team events if enabled
         if (config.get('features.teamEvents') && config.get('user.teamId')) {
             await this.handleLoadTeamEvents();
@@ -107,7 +127,9 @@ export class SmartCopilotPanel {
     private async handleSearchPrompts(query: string, categoryId?: string) {
         try {
             const categoryIdNum = categoryId ? parseInt(categoryId, 10) : undefined;
-            const prompts = await this.promptSearchService.searchPrompts(query, categoryIdNum);
+            // Only pass categoryId if it's a valid number
+            const validCategoryId = (categoryIdNum && !isNaN(categoryIdNum)) ? categoryIdNum : undefined;
+            const prompts = await this.promptSearchService.searchPrompts(query, validCategoryId);
             this._panel?.webview.postMessage({
                 type: 'promptSearchResults',
                 prompts
@@ -129,28 +151,59 @@ export class SmartCopilotPanel {
         }
     }
 
+
     private async handleUpdateCache() {
         try {
-            vscode.window.showInformationMessage('Updating cache...');
-            await this.promptSearchService.updateCache();
-            vscode.window.showInformationMessage('✅ Cache updated successfully!');
+            // Send progress message to webview instead of popup
+            this._panel?.webview.postMessage({
+                type: 'cacheUpdating',
+                message: 'Updating cache...',
+                messageType: 'info'
+            });
 
-            // Refresh categories after cache update
+            await this.promptSearchService.updateCache();
+
+            // Send success message to webview instead of popup
+            this._panel?.webview.postMessage({
+                type: 'cacheUpdated',
+                message: '✅ Cache updated successfully!',
+                messageType: 'success'
+            });
+
+            // Refresh categories and cache info after cache update
             await this.handleGetCategories();
+            await this.handleGetCacheInfo();
         } catch (error) {
-            vscode.window.showErrorMessage(`Failed to update cache: ${error}`);
+            // Send error message to webview instead of popup
+            this._panel?.webview.postMessage({
+                type: 'cacheUpdateError',
+                message: `Failed to update cache: ${error}`,
+                messageType: 'error'
+            });
         }
     }
 
     private async handleClearCache() {
         try {
             await this.promptSearchService.clearCache();
-            vscode.window.showInformationMessage('✅ Cache cleared successfully!');
 
-            // Refresh categories after cache clear
+            // Send success message to webview instead of popup
+            this._panel?.webview.postMessage({
+                type: 'cacheCleared',
+                message: '✅ Cache cleared successfully!',
+                messageType: 'success'
+            });
+
+            // Refresh categories and cache info after cache clear
             await this.handleGetCategories();
+            await this.handleGetCacheInfo();
         } catch (error) {
-            vscode.window.showErrorMessage(`Failed to clear cache: ${error}`);
+            // Send error message to webview instead of popup
+            this._panel?.webview.postMessage({
+                type: 'cacheError',
+                message: `Failed to clear cache: ${error}`,
+                messageType: 'error'
+            });
         }
     }
 
@@ -200,7 +253,8 @@ export class SmartCopilotPanel {
                 'workbench.action.chat.open',                        // Open chat view (primary)
                 'workbench.panel.chat.view.copilot.focus',           // Focus Copilot chat panel
                 'workbench.action.quickchat.toggle',                 // Quick chat toggle
-                'workbench.action.chat.openInSidebar'                // Open chat in sidebar
+                'workbench.action.chat.openInSidebar',               // Open chat in sidebar
+                'github.copilot.chat.open'                           // GitHub Copilot Chat open
             ];
 
             let chatOpened = false;
@@ -217,6 +271,9 @@ export class SmartCopilotPanel {
                 }
             }
 
+            let message = '';
+            let messageType = 'info';
+
             // Wait for chat to open and become ready
             if (chatOpened) {
                 await new Promise(resolve => setTimeout(resolve, 1000));
@@ -224,78 +281,93 @@ export class SmartCopilotPanel {
                 // Try multiple approaches to insert the text
                 let textInserted = false;
 
-                // Approach 1: Try to use chat-specific commands
+                // Approach 1: Try to use GitHub Copilot Chat specific commands
                 try {
-                    // Try to send text directly to chat if such command exists
-                    const allCommands = await vscode.commands.getCommands(true);
+                    // Try to focus the chat input using available commands
+                    const focusCommands = [
+                        'workbench.panel.chat.view.copilot.focus',
+                        'workbench.action.chat.focus',
+                        'github.copilot.chat.focus'
+                    ];
 
-                    // Look for chat input commands
-                    const chatInputCommands = allCommands.filter(cmd =>
-                        cmd.includes('chat') && (cmd.includes('input') || cmd.includes('send') || cmd.includes('type'))
-                    );
-
-                    console.log('Available chat commands:', chatInputCommands);
-
-                    // Try each chat input command
-                    for (const cmd of chatInputCommands) {
+                    let focused = false;
+                    for (const cmd of focusCommands) {
                         try {
-                            await vscode.commands.executeCommand(cmd, prompt);
-                            textInserted = true;
+                            await vscode.commands.executeCommand(cmd);
+                            focused = true;
                             break;
-                        } catch (cmdError) {
-                            console.log(`Command ${cmd} failed:`, cmdError);
+                        } catch (e) {
+                            // Command doesn't exist, try next one
                             continue;
                         }
                     }
+
+                    if (focused) {
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+
+                        // Use the type command to insert text
+                        await vscode.commands.executeCommand('type', { text: prompt });
+                        textInserted = true;
+                    }
                 } catch (error) {
-                    console.log('Chat command approach failed:', error);
+                    console.log('Direct typing approach failed:', error);
                 }
 
-                // Approach 2: If direct commands didn't work, try clipboard + paste
+                // Approach 2: If direct typing didn't work, try clipboard + paste
                 if (!textInserted) {
                     try {
                         await vscode.env.clipboard.writeText(prompt);
 
-                        // Try to focus the chat input and paste
-                        await vscode.commands.executeCommand('workbench.panel.chat.view.copilot.focus');
-                        await new Promise(resolve => setTimeout(resolve, 500));
-                        await vscode.commands.executeCommand('editor.action.clipboardPasteAction');
+                        // Try to focus the chat input using available commands
+                        const focusCommands = [
+                            'workbench.panel.chat.view.copilot.focus',
+                            'workbench.action.chat.focus',
+                            'github.copilot.chat.focus'
+                        ];
 
-                        textInserted = true;
+                        let focused = false;
+                        for (const cmd of focusCommands) {
+                            try {
+                                await vscode.commands.executeCommand(cmd);
+                                focused = true;
+                                break;
+                            } catch (e) {
+                                // Command doesn't exist, try next one
+                                continue;
+                            }
+                        }
+
+                        if (focused) {
+                            await new Promise(resolve => setTimeout(resolve, 500));
+                            await vscode.commands.executeCommand('editor.action.clipboardPasteAction');
+                            textInserted = true;
+                        }
                     } catch (pasteError) {
                         console.log('Clipboard paste approach failed:', pasteError);
                     }
                 }
 
-                // Provide appropriate feedback
+                // Set appropriate message
                 if (textInserted) {
-                    vscode.window.showInformationMessage(
-                        '💬 Chat opened and prompt inserted!',
-                        'Got it'
-                    );
+                    message = '💬 Chat opened and prompt inserted!';
+                    messageType = 'success';
                 } else {
                     await vscode.env.clipboard.writeText(prompt);
-                    vscode.window.showInformationMessage(
-                        '💬 Chat opened! Prompt copied to clipboard - paste it in the chat.',
-                        'Got it'
-                    );
+                    message = '💬 Chat opened! Prompt copied to clipboard - paste it in the chat.';
+                    messageType = 'warning';
                 }
             } else {
                 // Copy to clipboard and provide instructions
                 await vscode.env.clipboard.writeText(prompt);
-                vscode.window.showInformationMessage(
-                    '📋 Prompt copied to clipboard. Press Ctrl+I (Cmd+I on Mac) to open chat and paste.',
-                    'Open Chat'
-                ).then(selection => {
-                    if (selection === 'Open Chat') {
-                        vscode.commands.executeCommand('workbench.action.chat.open');
-                    }
-                });
+                message = '📋 Prompt copied to clipboard. Press Ctrl+I (Cmd+I on Mac) to open chat and paste.';
+                messageType = 'info';
             }
 
-            // Send success message to webview
+            // Send message to webview instead of showing popup
             this._panel?.webview.postMessage({
-                type: 'copilotSent'
+                type: 'copilotSent',
+                message: message,
+                messageType: messageType
             });
 
         } catch (error) {
@@ -339,6 +411,8 @@ export class SmartCopilotPanel {
 
     private async handleOpenSettings() {
         try {
+            // Close the panel first, then open settings
+            this.dispose();
             await vscode.commands.executeCommand('workbench.action.openSettings', 'smartCopilot');
         } catch (error) {
             console.error('Error opening settings:', error);

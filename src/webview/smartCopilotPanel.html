@@ -30,6 +30,11 @@
             background-color: var(--vscode-panel-background);
         }
 
+        /* Ensure proper spacing between prompt search and team events */
+        #promptSearchSection {
+            margin-bottom: 40px;
+        }
+
         .section-title {
             font-size: 16px;
             font-weight: bold;
@@ -47,8 +52,113 @@
         .search-row {
             display: flex;
             gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .category-select {
+            flex: 0 0 200px;
+            padding: 8px;
+            border: 1px solid var(--vscode-input-border);
+            border-radius: 4px;
+            background-color: var(--vscode-input-background);
+            color: var(--vscode-input-foreground);
+            font-size: 14px;
+        }
+
+        .search-input {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid var(--vscode-input-border);
+            border-radius: 4px;
+            background-color: var(--vscode-input-background);
+            color: var(--vscode-input-foreground);
+            font-size: 14px;
+        }
+
+        .search-button {
+            flex: 0 0 80px;
+            padding: 8px 16px;
+            background-color: var(--vscode-button-background);
+            color: var(--vscode-button-foreground);
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .search-button:hover {
+            background-color: var(--vscode-button-hoverBackground);
+        }
+
+        .prompt-list {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid var(--vscode-panel-border);
+            border-radius: 4px;
+            background-color: var(--vscode-panel-background);
+        }
+
+        .prompt-item {
+            padding: 10px;
+            border-bottom: 1px solid var(--vscode-panel-border);
+            cursor: pointer;
+        }
+
+        .prompt-item:hover {
+            background-color: var(--vscode-list-hoverBackground);
+        }
+
+        .prompt-item:last-child {
+            border-bottom: none;
+        }
+
+        .prompt-title {
+            font-weight: 600;
+            color: var(--vscode-foreground);
+        }
+
+        .prompt-description {
+            font-size: 12px;
+            color: var(--vscode-descriptionForeground);
+            margin-top: 4px;
+        }
+
+        .prompt-category {
+            font-size: 11px;
+            color: var(--vscode-badge-foreground);
+            background-color: var(--vscode-badge-background);
+            padding: 2px 6px;
+            border-radius: 8px;
+            display: inline-block;
+            margin-top: 4px;
+        }
+
+        .category-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 4px;
+        }
+
+        .category-chip {
+            background-color: var(--vscode-badge-background);
+            color: var(--vscode-badge-foreground);
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            display: flex;
             align-items: center;
-            position: relative;
+            gap: 4px;
+        }
+
+        .category-chip .remove {
+            cursor: pointer;
+            font-weight: bold;
+            opacity: 0.7;
+        }
+
+        .category-chip .remove:hover {
+            opacity: 1;
         }
 
         input[type="text"],
@@ -70,14 +180,6 @@
             border-color: var(--vscode-focusBorder);
         }
 
-        .search-input {
-            flex: 1;
-        }
-
-        .category-filter {
-            min-width: 140px;
-        }
-
         .prompt-input {
             width: 100%;
             min-height: 80px;
@@ -85,23 +187,29 @@
         }
 
         .selected-prompts {
-            min-height: 80px;
+            min-height: 40px;
+            max-height: 120px;
             border: 1px solid var(--vscode-input-border);
             border-radius: 3px;
-            padding: 10px;
+            padding: 8px;
             background-color: var(--vscode-input-background);
             margin-bottom: 10px;
+            overflow-y: auto;
         }
 
         .selected-prompt-item {
             background-color: var(--vscode-badge-background);
             color: var(--vscode-badge-foreground);
-            padding: 5px 10px;
+            padding: 4px 8px;
             margin: 2px;
             border-radius: 3px;
             display: inline-block;
-            font-size: 12px;
+            font-size: 11px;
             cursor: pointer;
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
         .selected-prompt-item:hover {
@@ -113,6 +221,14 @@
             margin-left: 5px;
             cursor: pointer;
             font-weight: bold;
+        }
+
+        .placeholder-text {
+            color: var(--vscode-descriptionForeground);
+            font-style: italic;
+            text-align: center;
+            padding: 10px;
+            font-size: 12px;
         }
 
         .button-group {
@@ -199,13 +315,60 @@
             overflow-y: auto;
             border: 1px solid var(--vscode-panel-border);
             border-radius: 3px;
-            position: absolute;
-            top: 100%;
-            left: 0;
-            right: 0;
-            z-index: 1000;
+            position: relative;
             background-color: var(--vscode-dropdown-background);
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            margin-bottom: 10px;
+        }
+
+        .autocomplete-item {
+            padding: 10px 12px;
+            cursor: pointer;
+            border-bottom: 1px solid var(--vscode-panel-border);
+            transition: background-color 0.2s ease;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .autocomplete-item:hover {
+            background-color: var(--vscode-list-hoverBackground);
+        }
+
+        .autocomplete-item:last-child {
+            border-bottom: none;
+        }
+
+        .autocomplete-item[data-type="category"] {
+            background-color: var(--vscode-badge-background);
+            color: var(--vscode-badge-foreground);
+        }
+
+        .autocomplete-item[data-type="category"]:hover {
+            background-color: var(--vscode-badge-foreground);
+            color: var(--vscode-badge-background);
+        }
+
+        .autocomplete-title {
+            font-weight: bold;
+            margin-bottom: 2px;
+        }
+
+        .autocomplete-description {
+            font-size: 12px;
+            color: var(--vscode-descriptionForeground);
+            margin-bottom: 4px;
+            line-height: 1.4;
+        }
+
+        .autocomplete-category {
+            font-size: 11px;
+            color: var(--vscode-badge-foreground);
+            background-color: var(--vscode-badge-background);
+            padding: 2px 6px;
+            border-radius: 10px;
+            display: inline-block;
+            align-self: flex-start;
         }
 
         .prompt-item {
@@ -295,23 +458,66 @@
         .status-pending {
             color: #FF9800;
         }
+
+        /* Message Area Styles */
+        .message-area {
+            margin-bottom: 20px;
+            padding: 12px 16px;
+            border-radius: 6px;
+            border-left: 4px solid;
+            background-color: var(--vscode-panel-background);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .message-area.success {
+            border-left-color: #4caf50;
+            background-color: rgba(76, 175, 80, 0.1);
+        }
+
+        .message-area.warning {
+            border-left-color: #ff9800;
+            background-color: rgba(255, 152, 0, 0.1);
+        }
+
+        .message-area.info {
+            border-left-color: #2196f3;
+            background-color: rgba(33, 150, 243, 0.1);
+        }
+
+        .message-area.error {
+            border-left-color: #f44336;
+            background-color: rgba(244, 67, 54, 0.1);
+        }
+
+        .message-content {
+            font-size: 14px;
+            line-height: 1.4;
+        }
     </style>
 </head>
 
 <body>
     <div class="container">
+        <!-- Message Area -->
+        <div id="messageArea" class="message-area" style="display: none;">
+            <div id="messageContent" class="message-content"></div>
+        </div>
+
         <!-- Prompt Search Section -->
         <div id="promptSearchSection" class="section">
             <div class="section-title">🔍 Smart Prompt Search</div>
             <div class="search-container">
                 <div class="search-row">
-                    <select id="categoryFilter" class="category-filter">
+                    <select id="categoryFilter" class="category-select">
                         <option value="">All Categories</option>
                     </select>
-                    <input type="text" id="promptSearch" class="search-input" placeholder="Search for prompts...">
+                    <input type="text" id="promptSearch" class="search-input" placeholder="Search prompts...">
+                    <button id="searchButton" class="search-button">Search</button>
                 </div>
-                <div id="autocompleteList" class="autocomplete-list hidden"></div>
-                <div id="selectedPrompts" class="selected-prompts"></div>
+                <div id="promptList" class="prompt-list"></div>
+                <div id="selectedPrompts" class="selected-prompts">
+                    <div class="placeholder-text">No prompts selected. Click on prompts above to add them.</div>
+                </div>
                 <div class="button-group">
                     <button id="sendToCopilot">Send to Copilot Chat</button>
                     <button id="clearSelection" class="secondary-button">Clear Selection</button>
@@ -376,12 +582,14 @@
             let currentConfig = {};
 
             // DOM elements
-            const promptSearchInput = document.getElementById('promptSearch');
             const categoryFilter = document.getElementById('categoryFilter');
-            const autocompleteList = document.getElementById('autocompleteList');
+            const promptSearch = document.getElementById('promptSearch');
+            const searchButton = document.getElementById('searchButton');
+            const promptList = document.getElementById('promptList');
             const selectedPrompts = document.getElementById('selectedPrompts');
             const sendToCopilotButton = document.getElementById('sendToCopilot');
             const clearSelectionButton = document.getElementById('clearSelection');
+
             const syncCacheButton = document.getElementById('syncCache');
             const eventsTable = document.getElementById('eventsTable');
             const updateCacheButton = document.getElementById('updateCache');
@@ -397,15 +605,15 @@
             let prompts = [];
             let events = [];
             let selectedPromptList = [];
+            let selectedCategories = [];
 
             // Event listeners
-            promptSearchInput.addEventListener('input', handleSearchInput);
-            promptSearchInput.addEventListener('focus', handleSearchInput);
-            promptSearchInput.addEventListener('blur', () => {
-                // Delay hiding to allow clicks on autocomplete items
-                setTimeout(() => autocompleteList.classList.add('hidden'), 200);
+            searchButton.addEventListener('click', handleSearch);
+            promptSearch.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter') {
+                    handleSearch();
+                }
             });
-            categoryFilter.addEventListener('change', handleSearchInput);
             sendToCopilotButton.addEventListener('click', handleSendToCopilot);
             clearSelectionButton.addEventListener('click', handleClearSelection);
             syncCacheButton.addEventListener('click', handleSyncCache);
@@ -413,23 +621,68 @@
             clearCacheButton.addEventListener('click', handleClearCache);
             document.getElementById('openSettings').addEventListener('click', handleOpenSettings);
 
-            function handleSearchInput() {
-                clearTimeout(searchTimeout);
-                searchTimeout = setTimeout(() => {
-                    const query = promptSearchInput.value.trim();
-                    const categoryId = categoryFilter.value;
-
-                    if (query.length >= 1) {
-                        vscode.postMessage({
-                            type: 'searchPrompts',
-                            query: query,
-                            categoryId: categoryId || undefined
-                        });
-                    } else {
-                        autocompleteList.classList.add('hidden');
-                    }
-                }, 150); // Faster response for autocomplete
+            function handleSearch() {
+                const query = promptSearch.value.trim();
+                const categoryId = categoryFilter.value;
+                
+                if (query || categoryId) {
+                    vscode.postMessage({
+                        type: 'searchPrompts',
+                        query: query,
+                        categoryId: categoryId
+                    });
+                }
             }
+
+            function renderPrompts(promptsData) {
+                prompts = promptsData;
+                promptList.innerHTML = '';
+
+                if (prompts.length === 0) {
+                    promptList.innerHTML = '<div class="placeholder-text">No prompts found. Try adjusting your search criteria.</div>';
+                    return;
+                }
+
+                prompts.forEach(prompt => {
+                    const item = document.createElement('div');
+                    item.className = 'prompt-item';
+                    item.dataset.id = prompt.id;
+
+                    item.innerHTML = `
+                        <div class="prompt-title">${prompt.title}</div>
+                        <div class="prompt-description">${prompt.description || prompt.prompt}</div>
+                        ${prompt.category ? `<div class="prompt-category">${prompt.category.name || prompt.category}</div>` : ''}
+                    `;
+
+                    item.addEventListener('click', () => selectPrompt(prompt));
+                    promptList.appendChild(item);
+                });
+            }
+
+            function selectPrompt(prompt) {
+                // Add to selection
+                selectedPromptList.push(prompt);
+
+                // Render updated selection
+                renderSelectedPrompts();
+
+                // Track selection
+                vscode.postMessage({
+                    type: 'selectPrompt',
+                    promptId: prompt.id
+                });
+            }
+
+            function loadCategories(categories) {
+                categoryFilter.innerHTML = '<option value="">All Categories</option>';
+                categories.forEach(category => {
+                    const option = document.createElement('option');
+                    option.value = category.id;
+                    option.textContent = category.name || category.display_name || category;
+                    categoryFilter.appendChild(option);
+                });
+            }
+
 
             function handleSendToCopilot() {
                 if (selectedPromptList.length === 0) {
@@ -530,16 +783,8 @@
                 });
             }
 
-            function renderCategories(categoriesData) {
-                categoryFilter.innerHTML = '<option value="">All Categories</option>';
-
-                categoriesData.forEach(category => {
-                    const option = document.createElement('option');
-                    option.value = category.id;
-                    option.textContent = category.icon + ' ' + category.display_name;
-                    categoryFilter.appendChild(option);
-                });
-            }
+            // Categories are now handled dynamically through the autocomplete API
+            // No need for separate category rendering
 
             function renderPrompts(promptsData) {
                 prompts = promptsData;
@@ -608,6 +853,18 @@
                 userIdSpan.textContent = config.userId || 'Not configured';
                 teamIdSpan.textContent = config.teamId || 'Not configured';
                 promptSearchEnabledSpan.textContent = config.promptSearchEnabled ? 'Enabled' : 'Disabled';
+
+                // Show/hide prompt search section based on setting
+                const promptSearchSection = document.getElementById('promptSearchSection');
+                if (promptSearchSection) {
+                    promptSearchSection.style.display = config.promptSearchEnabled ? 'block' : 'none';
+                }
+
+                // Show/hide team events section based on setting
+                const teamEventsSection = document.getElementById('teamEventsSection');
+                if (teamEventsSection) {
+                    teamEventsSection.style.display = config.teamEventsEnabled ? 'block' : 'none';
+                }
             }
 
             // Handle messages from extension
@@ -620,7 +877,7 @@
                         break;
 
                     case 'categoriesLoaded':
-                        renderCategories(message.categories);
+                        loadCategories(message.categories);
                         break;
 
                     case 'promptSearchResults':
@@ -645,7 +902,9 @@
                         break;
 
                     case 'copilotSent':
-                        vscode.window.showInformationMessage('✅ Prompts sent to Copilot chat!');
+                        if (message.message) {
+                            showMessage(message.message, message.messageType || 'info');
+                        }
                         break;
 
                     case 'remediationError':
@@ -657,11 +916,50 @@
                             btn.textContent = 'Remediate';
                         });
                         break;
+
+                    case 'cacheCleared':
+                        if (message.message) {
+                            showMessage(message.message, message.messageType || 'success');
+                        }
+                        break;
+
+                    case 'cacheError':
+                        if (message.message) {
+                            showMessage(message.message, message.messageType || 'error');
+                        }
+                        break;
+
+                    case 'cacheUpdating':
+                        if (message.message) {
+                            showMessage(message.message, message.messageType || 'info');
+                        }
+                        break;
+
+                    case 'cacheUpdated':
+                        if (message.message) {
+                            showMessage(message.message, message.messageType || 'success');
+                        }
+                        break;
+
+                    case 'cacheUpdateError':
+                        if (message.message) {
+                            showMessage(message.message, message.messageType || 'error');
+                        }
+                        break;
                 }
             });
 
             function renderCacheInfo(cacheInfo) {
-                const ageText = cacheInfo.age === Infinity ? 'Never' : cacheInfo.age + 'h ago';
+                // Handle age display properly
+                let ageText;
+                if (cacheInfo.age === Infinity || cacheInfo.age === null || cacheInfo.age === undefined) {
+                    ageText = 'Never';
+                } else if (isNaN(cacheInfo.age)) {
+                    ageText = 'Never';
+                } else {
+                    ageText = cacheInfo.age + 'h ago';
+                }
+
                 const sizeText = formatBytes(cacheInfo.size);
                 const status = cacheInfo.isValid ? '✅ Valid' : '❌ Invalid';
 
@@ -680,10 +978,34 @@
                 return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
             }
 
+            function showMessage(text, type = 'info') {
+                const messageArea = document.getElementById('messageArea');
+                const messageContent = document.getElementById('messageContent');
+
+                if (messageArea && messageContent) {
+                    messageContent.textContent = text;
+                    messageArea.className = `message-area ${type}`;
+                    messageArea.style.display = 'block';
+
+                    // Auto-hide after 5 seconds for success messages
+                    if (type === 'success') {
+                        setTimeout(() => {
+                            messageArea.style.display = 'none';
+                        }, 5000);
+                    }
+                }
+            }
+
             // Initialize
             vscode.postMessage({ type: 'getCategories' });
             vscode.postMessage({ type: 'getCacheInfo' });
-            if (currentConfig.teamEventsEnabled) {
+
+            // Apply initial configuration to set section visibility
+            if (currentConfig) {
+                updateConfig(currentConfig);
+            }
+
+            if (currentConfig && currentConfig.teamEventsEnabled) {
                 vscode.postMessage({ type: 'loadTeamEvents' });
             }
         })();

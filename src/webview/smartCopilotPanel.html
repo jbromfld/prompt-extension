@@ -624,7 +624,7 @@
             function handleSearch() {
                 const query = promptSearch.value.trim();
                 const categoryId = categoryFilter.value;
-                
+
                 if (query || categoryId) {
                     vscode.postMessage({
                         type: 'searchPrompts',
@@ -681,6 +681,26 @@
                     option.textContent = category.name || category.display_name || category;
                     categoryFilter.appendChild(option);
                 });
+            }
+
+            function renderSelectedPrompts() {
+                if (selectedPromptList.length === 0) {
+                    selectedPrompts.innerHTML = '<div class="placeholder-text">No prompts selected. Click on prompts above to add them.</div>';
+                    return;
+                }
+
+                selectedPrompts.innerHTML = selectedPromptList.map(prompt => `
+                    <div class="selected-prompt-item">
+                        <div class="selected-prompt-title">${prompt.title}</div>
+                        <div class="selected-prompt-description">${prompt.description || prompt.prompt}</div>
+                        <button class="remove-prompt" onclick="removeSelectedPrompt('${prompt.id}')">×</button>
+                    </div>
+                `).join('');
+            }
+
+            function removeSelectedPrompt(promptId) {
+                selectedPromptList = selectedPromptList.filter(p => p.id !== promptId);
+                renderSelectedPrompts();
             }
 
 

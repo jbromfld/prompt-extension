@@ -201,7 +201,7 @@ export class SmartCopilotPanel {
 
     private async handleSendToCopilotSimple(prompt: string, ratingPrompt?: any) {
         try {
-            console.log('Attempting to send prompt to Copilot:', prompt.substring(0, 100) + '...');
+            console.log('Attempting to send prompt to Copilot (length:', prompt.length, '):', prompt.substring(0, 100) + (prompt.length > 100 ? '...' : ''));
 
             // Approach 1: Open chat, focus input, and simulate typing
             try {

@@ -434,7 +434,7 @@
                     <input type="text" id="promptSearch" class="search-input" placeholder="Search for prompts...">
                 </div>
                 <div id="autocompleteList" class="autocomplete-list hidden"></div>
-               <div class="button-group">
+                <div class="button-group">
                     <button id="sendToCopilot">Send to Copilot Chat</button>
                     <button id="clearSelection" class="secondary-button">Clear Selection</button>
                 </div>
@@ -596,24 +596,27 @@
             }
 
             function handleSendToCopilot() {
-                if (selectedPromptList.length === 0) {
-                    showMessage('Please select at least one prompt', 'error');
+                // Find the currently selected prompt (the one that was clicked)
+                // We'll track this in the selectPrompt function
+                const currentPrompt = window.currentSelectedPrompt;
+
+                if (!currentPrompt) {
+                    showMessage('Please select a prompt first', 'error');
                     return;
                 }
 
-                const combinedPrompt = selectedPromptList.map(p => p.prompt).join('\n\n---\n\n');
-                const firstPrompt = selectedPromptList[0]; // Use first prompt for rating
+                const promptText = currentPrompt.prompt || currentPrompt.description;
 
                 vscode.postMessage({
                     type: 'sendToCopilot',
-                    prompt: combinedPrompt,
-                    ratingPrompt: firstPrompt // Include the prompt for rating
+                    prompt: promptText,
+                    ratingPrompt: currentPrompt // Include the prompt for rating
                 });
             }
 
             function handleClearSelection() {
-                selectedPromptList = [];
-                renderSelectedPrompts();
+                window.currentSelectedPrompt = null;
+                showMessage('Selection cleared', 'info');
             }
 
             function showMessage(message, type = 'info') {
@@ -634,9 +637,8 @@
                 // Reset category filter
                 categoryFilter.value = '';
 
-                // Clear selected prompts
-                selectedPromptList = [];
-                renderSelectedPrompts();
+                // Clear current selected prompt
+                window.currentSelectedPrompt = null;
 
                 // Clear all prompts and hide autocomplete
                 allPrompts = [];
@@ -797,49 +799,20 @@
             }
 
             function selectPrompt(prompt) {
-                // Check if prompt is already selected
-                if (selectedPromptList.find(p => p.id === prompt.id)) {
-                    return; // Already selected
-                }
-
-                // Add to selection
-                selectedPromptList.push(prompt);
+                // Store the current selected prompt globally
+                window.currentSelectedPrompt = prompt;
                 autocompleteList.classList.add('hidden');
-
-                // Render updated selection
-                renderSelectedPrompts();
 
                 // Track selection
                 vscode.postMessage({
                     type: 'selectPrompt',
                     promptId: prompt.id
                 });
+
+                // Show a brief confirmation
+                showMessage(`Selected: ${prompt.title}`, 'info');
             }
 
-            function removePrompt(promptId) {
-                selectedPromptList = selectedPromptList.filter(p => p.id !== promptId);
-                renderSelectedPrompts();
-            }
-
-            function renderSelectedPrompts() {
-                selectedPrompts.innerHTML = '';
-
-                if (selectedPromptList.length === 0) {
-                    selectedPrompts.innerHTML = '<div style="color: var(--vscode-descriptionForeground); font-style: italic;">No prompts selected. Click on prompts above to add them.</div>';
-                    return;
-                }
-
-                selectedPromptList.forEach(prompt => {
-                    const item = document.createElement('div');
-                    item.className = 'selected-prompt-item';
-                    const categoryName = prompt.category?.display_name || prompt.category?.name || 'Unknown';
-                    const categoryIcon = prompt.category?.icon || '📁';
-
-                    item.innerHTML = categoryIcon + ' ' + categoryName +
-                        '<span class="remove-btn" onclick="removePrompt(\'' + prompt.id + '\')">×</span>';
-                    selectedPrompts.appendChild(item);
-                });
-            }
 
             function renderCategories(categoriesData) {
                 categoryFilter.innerHTML = '<option value="">All Categories</option>';

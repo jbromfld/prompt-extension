@@ -229,7 +229,7 @@ export class SmartCopilotPanel {
                     message: '✅ Prompt inserted into Copilot Chat!',
                     messageType: 'success'
                 });
-                
+
                 // Show rating prompt instead of resetting
                 if (ratingPrompt) {
                     this._panel.webview.postMessage({
@@ -261,7 +261,7 @@ export class SmartCopilotPanel {
                     message: '✅ Prompt sent to Copilot Chat!',
                     messageType: 'success'
                 });
-                
+
                 // Show rating prompt instead of resetting
                 if (ratingPrompt) {
                     this._panel.webview.postMessage({
@@ -326,19 +326,13 @@ export class SmartCopilotPanel {
     private async handleSubmitRating(promptId: string, rating: number, prompt: any) {
         try {
             console.log(`Submitting rating for prompt ${promptId}: ${rating} stars`);
-            
-            // For now, just log the rating locally
-            // In the future, this could send to the backend
-            console.log('Rating data:', {
-                promptId,
-                rating,
-                promptTitle: prompt.title,
-                timestamp: new Date().toISOString()
-            });
-            
+
+            // Submit rating to backend
+            await this.promptSearchService.ratePrompt(promptId, rating);
+
             // Show success message (already shown by webview)
             console.log(`Rating submitted successfully: ${rating} stars for "${prompt.title}"`);
-            
+
         } catch (error) {
             console.error('Error submitting rating:', error);
             this._panel.webview.postMessage({

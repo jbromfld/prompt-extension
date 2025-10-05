@@ -152,6 +152,23 @@ export class PromptSearchService {
         }
     }
 
+    async ratePrompt(promptId: string, rating: number): Promise<void> {
+        try {
+            // Try API service first
+            try {
+                await this.smartCopilotService.ratePrompt(promptId, rating);
+                // Update local cache in background to reflect rating changes
+                this.updateLocalCacheInBackground();
+            } catch (apiError) {
+                console.error('Failed to submit rating:', apiError);
+                throw apiError; // Rating is important, so we should surface the error
+            }
+        } catch (error) {
+            console.error('Error submitting rating:', error);
+            throw error; // Rating is important functionality
+        }
+    }
+
     /**
      * Manually update local cache from database
      */

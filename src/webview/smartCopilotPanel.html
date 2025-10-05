@@ -193,7 +193,7 @@
             color: #ffc107;
         }
 
-        .star:hover ~ .star {
+        .star:hover~.star {
             color: #ddd;
         }
 
@@ -434,32 +434,31 @@
                     <input type="text" id="promptSearch" class="search-input" placeholder="Search for prompts...">
                 </div>
                 <div id="autocompleteList" class="autocomplete-list hidden"></div>
-                <div id="selectedPrompts" class="selected-prompts"></div>
                <div class="button-group">
-                   <button id="sendToCopilot">Send to Copilot Chat</button>
-                   <button id="clearSelection" class="secondary-button">Clear Selection</button>
-               </div>
-               <div id="messageArea" class="message-area hidden"></div>
-               
-               <!-- Prompt Rating Section -->
-               <div id="promptRatingSection" class="prompt-rating-section hidden">
-                   <div class="section-title">⭐ Rate this prompt</div>
-                   <div id="ratedPrompt" class="rated-prompt"></div>
-                   <div class="rating-container">
-                       <div class="stars">
-                           <span class="star" data-rating="1">★</span>
-                           <span class="star" data-rating="2">★</span>
-                           <span class="star" data-rating="3">★</span>
-                           <span class="star" data-rating="4">★</span>
-                           <span class="star" data-rating="5">★</span>
-                       </div>
-                       <div id="ratingText" class="rating-text">Click a star to rate</div>
-                   </div>
-                   <div class="rating-actions">
-                       <button id="submitRating" class="primary-button" disabled>Submit Rating</button>
-                       <button id="skipRating" class="secondary-button">Skip</button>
-                   </div>
-               </div>
+                    <button id="sendToCopilot">Send to Copilot Chat</button>
+                    <button id="clearSelection" class="secondary-button">Clear Selection</button>
+                </div>
+                <div id="messageArea" class="message-area hidden"></div>
+
+                <!-- Prompt Rating Section -->
+                <div id="promptRatingSection" class="prompt-rating-section hidden">
+                    <div class="section-title">⭐ Rate this prompt</div>
+                    <div id="ratedPrompt" class="rated-prompt"></div>
+                    <div class="rating-container">
+                        <div class="stars">
+                            <span class="star" data-rating="1">★</span>
+                            <span class="star" data-rating="2">★</span>
+                            <span class="star" data-rating="3">★</span>
+                            <span class="star" data-rating="4">★</span>
+                            <span class="star" data-rating="5">★</span>
+                        </div>
+                        <div id="ratingText" class="rating-text">Click a star to rate</div>
+                    </div>
+                    <div class="rating-actions">
+                        <button id="submitRating" class="primary-button" disabled>Submit Rating</button>
+                        <button id="skipRating" class="secondary-button">Skip</button>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -523,21 +522,20 @@
             const promptSearchInput = document.getElementById('promptSearch');
             const categoryFilter = document.getElementById('categoryFilter');
             const autocompleteList = document.getElementById('autocompleteList');
-            const selectedPrompts = document.getElementById('selectedPrompts');
             const sendToCopilotButton = document.getElementById('sendToCopilot');
             const clearSelectionButton = document.getElementById('clearSelection');
             const syncCacheButton = document.getElementById('syncCache');
             const eventsTable = document.getElementById('eventsTable');
             const updateCacheButton = document.getElementById('updateCache');
             const clearCacheButton = document.getElementById('clearCache');
-               const cacheStatus = document.getElementById('cacheStatus');
-               const messageArea = document.getElementById('messageArea');
-               const promptRatingSection = document.getElementById('promptRatingSection');
-               const ratedPrompt = document.getElementById('ratedPrompt');
-               const stars = document.querySelectorAll('.star');
-               const ratingText = document.getElementById('ratingText');
-               const submitRatingButton = document.getElementById('submitRating');
-               const skipRatingButton = document.getElementById('skipRating');
+            const cacheStatus = document.getElementById('cacheStatus');
+            const messageArea = document.getElementById('messageArea');
+            const promptRatingSection = document.getElementById('promptRatingSection');
+            const ratedPrompt = document.getElementById('ratedPrompt');
+            const stars = document.querySelectorAll('.star');
+            const ratingText = document.getElementById('ratingText');
+            const submitRatingButton = document.getElementById('submitRating');
+            const skipRatingButton = document.getElementById('skipRating');
 
             // Configuration display elements
             const userIdSpan = document.getElementById('userId');
@@ -548,7 +546,6 @@
             let prompts = [];
             let allPrompts = []; // Store all prompts for the selected category
             let events = [];
-            let selectedPromptList = [];
             let currentRatingPrompt = null; // Store the prompt being rated
             let selectedRating = 0; // Current selected rating
 
@@ -572,7 +569,7 @@
                 star.addEventListener('click', () => handleStarClick(parseInt(star.dataset.rating)));
                 star.addEventListener('mouseenter', () => highlightStars(parseInt(star.dataset.rating)));
             });
-            
+
             submitRatingButton.addEventListener('click', handleSubmitRating);
             skipRatingButton.addEventListener('click', handleSkipRating);
 
@@ -630,106 +627,106 @@
                 }, 5000);
             }
 
-               function resetPanel() {
-                   // Clear search input
-                   promptSearchInput.value = '';
-                   
-                   // Reset category filter
-                   categoryFilter.value = '';
-                   
-                   // Clear selected prompts
-                   selectedPromptList = [];
-                   renderSelectedPrompts();
-                   
-                   // Clear all prompts and hide autocomplete
-                   allPrompts = [];
-                   prompts = [];
-                   autocompleteList.classList.add('hidden');
-                   
-                   // Hide message area
-                   messageArea.classList.add('hidden');
-                   
-                   console.log('Panel reset completed');
-               }
+            function resetPanel() {
+                // Clear search input
+                promptSearchInput.value = '';
 
-               function showRatingPrompt(prompt) {
-                   currentRatingPrompt = prompt;
-                   selectedRating = 0;
-                   
-                   // Show the prompt text
-                   ratedPrompt.textContent = prompt.prompt || prompt.description;
-                   
-                   // Reset stars
-                   stars.forEach(star => star.classList.remove('active'));
-                   ratingText.textContent = 'Click a star to rate';
-                   submitRatingButton.disabled = true;
-                   
-                   // Show rating section
-                   promptRatingSection.classList.remove('hidden');
-                   
-                   console.log('Showing rating prompt:', prompt.title);
-               }
+                // Reset category filter
+                categoryFilter.value = '';
 
-               function handleStarClick(rating) {
-                   selectedRating = rating;
-                   highlightStars(rating);
-                   ratingText.textContent = getRatingText(rating);
-                   submitRatingButton.disabled = false;
-                   
-                   console.log('Selected rating:', rating);
-               }
+                // Clear selected prompts
+                selectedPromptList = [];
+                renderSelectedPrompts();
 
-               function highlightStars(rating) {
-                   stars.forEach((star, index) => {
-                       if (index < rating) {
-                           star.classList.add('active');
-                       } else {
-                           star.classList.remove('active');
-                       }
-                   });
-               }
+                // Clear all prompts and hide autocomplete
+                allPrompts = [];
+                prompts = [];
+                autocompleteList.classList.add('hidden');
 
-               function getRatingText(rating) {
-                   const texts = {
-                       1: 'Poor - Not helpful',
-                       2: 'Fair - Somewhat helpful',
-                       3: 'Good - Helpful',
-                       4: 'Very Good - Very helpful',
-                       5: 'Excellent - Extremely helpful'
-                   };
-                   return texts[rating] || 'Click a star to rate';
-               }
+                // Hide message area
+                messageArea.classList.add('hidden');
 
-               function handleSubmitRating() {
-                   if (selectedRating > 0 && currentRatingPrompt) {
-                       // Send rating to backend
-                       vscode.postMessage({
-                           type: 'submitRating',
-                           promptId: currentRatingPrompt.id,
-                           rating: selectedRating,
-                           prompt: currentRatingPrompt
-                       });
-                       
-                       showMessage(`Thank you for rating this prompt ${selectedRating} star${selectedRating > 1 ? 's' : ''}!`, 'success');
-                       
-                       // Hide rating section
-                       promptRatingSection.classList.add('hidden');
-                       currentRatingPrompt = null;
-                       selectedRating = 0;
-                       
-                       console.log('Rating submitted:', selectedRating);
-                   }
-               }
+                console.log('Panel reset completed');
+            }
 
-               function handleSkipRating() {
-                   // Hide rating section without submitting
-                   promptRatingSection.classList.add('hidden');
-                   currentRatingPrompt = null;
-                   selectedRating = 0;
-                   
-                   showMessage('Rating skipped', 'info');
-                   console.log('Rating skipped');
-               }
+            function showRatingPrompt(prompt) {
+                currentRatingPrompt = prompt;
+                selectedRating = 0;
+
+                // Show the prompt text
+                ratedPrompt.textContent = prompt.prompt || prompt.description;
+
+                // Reset stars
+                stars.forEach(star => star.classList.remove('active'));
+                ratingText.textContent = 'Click a star to rate';
+                submitRatingButton.disabled = true;
+
+                // Show rating section
+                promptRatingSection.classList.remove('hidden');
+
+                console.log('Showing rating prompt:', prompt.title);
+            }
+
+            function handleStarClick(rating) {
+                selectedRating = rating;
+                highlightStars(rating);
+                ratingText.textContent = getRatingText(rating);
+                submitRatingButton.disabled = false;
+
+                console.log('Selected rating:', rating);
+            }
+
+            function highlightStars(rating) {
+                stars.forEach((star, index) => {
+                    if (index < rating) {
+                        star.classList.add('active');
+                    } else {
+                        star.classList.remove('active');
+                    }
+                });
+            }
+
+            function getRatingText(rating) {
+                const texts = {
+                    1: 'Poor - Not helpful',
+                    2: 'Fair - Somewhat helpful',
+                    3: 'Good - Helpful',
+                    4: 'Very Good - Very helpful',
+                    5: 'Excellent - Extremely helpful'
+                };
+                return texts[rating] || 'Click a star to rate';
+            }
+
+            function handleSubmitRating() {
+                if (selectedRating > 0 && currentRatingPrompt) {
+                    // Send rating to backend
+                    vscode.postMessage({
+                        type: 'submitRating',
+                        promptId: currentRatingPrompt.id,
+                        rating: selectedRating,
+                        prompt: currentRatingPrompt
+                    });
+
+                    showMessage(`Thank you for rating this prompt ${selectedRating} star${selectedRating > 1 ? 's' : ''}!`, 'success');
+
+                    // Hide rating section
+                    promptRatingSection.classList.add('hidden');
+                    currentRatingPrompt = null;
+                    selectedRating = 0;
+
+                    console.log('Rating submitted:', selectedRating);
+                }
+            }
+
+            function handleSkipRating() {
+                // Hide rating section without submitting
+                promptRatingSection.classList.add('hidden');
+                currentRatingPrompt = null;
+                selectedRating = 0;
+
+                showMessage('Rating skipped', 'info');
+                console.log('Rating skipped');
+            }
 
             function filterPromptsLocally(query) {
                 if (!query || query.length === 0) {

@@ -158,7 +158,7 @@ export class SmartCopilotService {
             if (!query || query.trim().length === 0) {
                 return { results: [], query: '', category_filter: null };
             }
-            
+
             const response = await this.makeRequest<any>(
                 `/search/autocomplete?q=${encodeURIComponent(query.trim())}&limit=${limit}`
             );
@@ -185,12 +185,27 @@ export class SmartCopilotService {
 
     async usePrompt(promptId: string): Promise<void> {
         try {
-            // This endpoint doesn't exist in the backend yet
-            // Just log the usage for now
-            console.log(`Prompt used: ${promptId}`);
+            await this.makeRequest(
+                `/prompts/${promptId}/use`,
+                'POST'
+            );
+            console.log(`Prompt usage tracked: ${promptId}`);
         } catch (error) {
             console.error('Error tracking prompt usage:', error);
             // Don't throw error - this is not critical
+        }
+    }
+
+    async ratePrompt(promptId: string, rating: number): Promise<void> {
+        try {
+            await this.makeRequest(
+                `/prompts/${promptId}/rate?rating=${rating}`,
+                'POST'
+            );
+            console.log(`Prompt rated: ${promptId} - ${rating} stars`);
+        } catch (error) {
+            console.error('Error rating prompt:', error);
+            throw error; // Rating is more important than usage tracking
         }
     }
 

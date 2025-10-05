@@ -169,6 +169,25 @@ export class PromptSearchService {
         }
     }
 
+    async searchKnowledge(query: string, spaceKey?: string, limit: number = 10): Promise<any[]> {
+        try {
+            // Try API service first
+            try {
+                const results = await this.smartCopilotService.searchKnowledge(query, spaceKey, limit);
+                console.log(`Found ${results.length} knowledge results for query: "${query}"`);
+                return results;
+            } catch (apiError) {
+                console.log('API service not available for knowledge search:', apiError);
+                // For now, return empty array if API is not available
+                // In the future, we could implement local knowledge search
+                return [];
+            }
+        } catch (error) {
+            console.error('Error searching knowledge:', error);
+            return [];
+        }
+    }
+
     /**
      * Manually update local cache from database
      */

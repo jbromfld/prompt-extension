@@ -152,6 +152,35 @@ export class SmartCopilotService {
         }
     }
 
+    async searchKnowledge(query: string, spaceKey?: string, limit: number = 10): Promise<any[]> {
+        try {
+            const url = new URL('/search/knowledge', this.config.serviceUrl);
+            url.searchParams.set('q', query);
+            if (spaceKey) {
+                url.searchParams.set('space_key', spaceKey);
+            }
+            url.searchParams.set('limit', limit.toString());
+
+            const response = await fetch(url.toString(), {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(this.config.apiKey && { 'Authorization': `Bearer ${this.config.apiKey}` })
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(`Knowledge search failed: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            return data.results || [];
+        } catch (error) {
+            console.error('Error searching knowledge:', error);
+            return [];
+        }
+    }
+
     async autocompleteSearch(query: string, limit: number = 10): Promise<any> {
         try {
             // Don't call the endpoint if query is empty

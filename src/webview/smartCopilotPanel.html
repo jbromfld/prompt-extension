@@ -345,6 +345,53 @@
             border-bottom: none;
         }
 
+        .knowledge-item {
+            padding: 12px;
+            border-bottom: 1px solid var(--vscode-panel-border);
+            cursor: pointer;
+        }
+
+        .knowledge-item:hover {
+            background-color: var(--vscode-list-hoverBackground);
+        }
+
+        .knowledge-item:last-child {
+            border-bottom: none;
+        }
+
+        .knowledge-title {
+            font-weight: bold;
+            color: var(--vscode-textLink-foreground);
+            margin-bottom: 4px;
+        }
+
+        .knowledge-text {
+            color: var(--vscode-foreground);
+            font-size: 13px;
+            margin-bottom: 6px;
+            line-height: 1.4;
+        }
+
+        .knowledge-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 11px;
+            color: var(--vscode-descriptionForeground);
+        }
+
+        .knowledge-space {
+            background-color: var(--vscode-badge-background);
+            color: var(--vscode-badge-foreground);
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 10px;
+        }
+
+        .knowledge-similarity {
+            color: var(--vscode-textPreformat-foreground);
+        }
+
         .prompt-type {
             font-size: 11px;
             color: var(--vscode-descriptionForeground);
@@ -462,6 +509,41 @@
             </div>
         </div>
 
+        <!-- Knowledge Search Section -->
+        <div id="knowledgeSearchSection" class="section">
+            <div class="section-title">📚 Knowledge Base Search</div>
+            <div class="search-container">
+                <div class="search-row">
+                    <input type="text" id="knowledgeSearchInput" placeholder="Search knowledge base..."
+                        class="search-input">
+                    <button id="searchKnowledge" class="primary-button">Search</button>
+                </div>
+                <div class="search-row">
+                    <select id="knowledgeSpaceFilter" class="category-select">
+                        <option value="">All Spaces</option>
+                        <option value="vscode-dev">VS Code Development</option>
+                        <option value="python-api">Python API</option>
+                        <option value="database">Database</option>
+                        <option value="devops">DevOps</option>
+                        <option value="typescript">TypeScript</option>
+                        <option value="frontend">Frontend</option>
+                        <option value="python">Python</option>
+                        <option value="version-control">Version Control</option>
+                        <option value="api-design">API Design</option>
+                        <option value="testing">Testing</option>
+                        <option value="security">Security</option>
+                    </select>
+                </div>
+            </div>
+            <div id="knowledgeResults" class="results-container hidden">
+                <div class="results-header">
+                    <span id="knowledgeResultsCount">0 results</span>
+                    <button id="clearKnowledgeResults" class="secondary-button">Clear</button>
+                </div>
+                <div id="knowledgeResultsList" class="results-list"></div>
+            </div>
+        </div>
+
         <!-- Team Events Section -->
         <div id="teamEventsSection" class="section">
             <div class="section-title">📊 Team Events</div>
@@ -528,6 +610,15 @@
             const eventsTable = document.getElementById('eventsTable');
             const updateCacheButton = document.getElementById('updateCache');
             const clearCacheButton = document.getElementById('clearCache');
+
+            // Knowledge search elements
+            const knowledgeSearchInput = document.getElementById('knowledgeSearchInput');
+            const knowledgeSpaceFilter = document.getElementById('knowledgeSpaceFilter');
+            const searchKnowledgeButton = document.getElementById('searchKnowledge');
+            const knowledgeResults = document.getElementById('knowledgeResults');
+            const knowledgeResultsCount = document.getElementById('knowledgeResultsCount');
+            const knowledgeResultsList = document.getElementById('knowledgeResultsList');
+            const clearKnowledgeResults = document.getElementById('clearKnowledgeResults');
             const cacheStatus = document.getElementById('cacheStatus');
             const messageArea = document.getElementById('messageArea');
             const promptRatingSection = document.getElementById('promptRatingSection');
@@ -561,6 +652,15 @@
             clearSelectionButton.addEventListener('click', handleClearSelection);
             syncCacheButton.addEventListener('click', handleSyncCache);
             updateCacheButton.addEventListener('click', handleUpdateCache);
+
+            // Knowledge search event listeners
+            searchKnowledgeButton.addEventListener('click', handleKnowledgeSearch);
+            clearKnowledgeResults.addEventListener('click', handleClearKnowledgeResults);
+            knowledgeSearchInput.addEventListener('keypress', function (e) {
+                if (e.key === 'Enter') {
+                    handleKnowledgeSearch();
+                }
+            });
             clearCacheButton.addEventListener('click', handleClearCache);
             document.getElementById('openSettings').addEventListener('click', handleOpenSettings);
 
@@ -934,6 +1034,10 @@
                         showRatingPrompt(message.prompt);
                         break;
 
+                    case 'knowledgeSearchResults':
+                        renderKnowledgeResults(message.results);
+                        break;
+
                     case 'cacheInfoLoaded':
                         renderCacheInfo(message.cacheInfo);
                         break;
@@ -988,6 +1092,75 @@
             vscode.postMessage({ type: 'getCacheInfo' });
             if (currentConfig.teamEventsEnabled) {
                 vscode.postMessage({ type: 'loadTeamEvents' });
+            }
+
+            // Knowledge search functions
+            async function handleKnowledgeSearch() {
+                const query = knowledgeSearchInput.value.trim();
+                const spaceKey = knowledgeSpaceFilter.value || undefined;
+
+                if (!query) {
+                    showMessage('Please enter a search query', 'warning');
+                    return;
+                }
+
+                try {
+                    showMessage('Searching knowledge base...', 'info');
+
+                    vscode.postMessage({
+                        type: 'searchKnowledge',
+                        query: query,
+                        spaceKey: spaceKey
+                    });
+                } catch (error) {
+                    console.error('Knowledge search error:', error);
+                    showMessage('Knowledge search failed: ' + error.message, 'error');
+                }
+            }
+
+            function handleClearKnowledgeResults() {
+                knowledgeResults.classList.add('hidden');
+                knowledgeResultsList.innerHTML = '';
+                knowledgeResultsCount.textContent = '0 results';
+            }
+
+            function renderKnowledgeResults(results) {
+                if (results.length === 0) {
+                    knowledgeResultsList.innerHTML = '<div class="no-results">No knowledge found for this query.</div>';
+                } else {
+                    knowledgeResultsList.innerHTML = results.map(result => `
+                        <div class="knowledge-item" data-id="${result.id}">
+                            <div class="knowledge-title">${escapeHtml(result.page_title || 'Untitled')}</div>
+                            <div class="knowledge-text">${escapeHtml(result.chunk_text.substring(0, 200))}${result.chunk_text.length > 200 ? '...' : ''}</div>
+                            <div class="knowledge-meta">
+                                <div>
+                                    ${result.space_key ? `<span class="knowledge-space">${escapeHtml(result.space_key)}</span>` : ''}
+                                    ${result.source_url ? `<a href="${escapeHtml(result.source_url)}" target="_blank" class="knowledge-link">Source</a>` : ''}
+                                </div>
+                                <div class="knowledge-similarity">${(result.similarity * 100).toFixed(1)}% match</div>
+                            </div>
+                        </div>
+                    `).join('');
+
+                    // Add click handlers for knowledge items
+                    knowledgeResultsList.querySelectorAll('.knowledge-item').forEach(item => {
+                        item.addEventListener('click', () => {
+                            const knowledgeId = item.dataset.id;
+                            const result = results.find(r => r.id === knowledgeId);
+                            if (result) {
+                                // Copy knowledge text to clipboard or send to Copilot
+                                vscode.postMessage({
+                                    type: 'useKnowledge',
+                                    knowledge: result
+                                });
+                                showMessage('Knowledge copied to clipboard', 'success');
+                            }
+                        });
+                    });
+                }
+
+                knowledgeResultsCount.textContent = `${results.length} result${results.length !== 1 ? 's' : ''}`;
+                knowledgeResults.classList.remove('hidden');
             }
         })();
     </script>

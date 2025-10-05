@@ -54,6 +54,12 @@ export class SmartCopilotPanel {
                 case 'searchPrompts':
                     await this.handleSearchPrompts(data.query, data.categoryId);
                     break;
+                case 'searchKnowledge':
+                    await this.handleSearchKnowledge(data.query, data.spaceKey);
+                    break;
+                case 'useKnowledge':
+                    await this.handleUseKnowledge(data.knowledge);
+                    break;
                 case 'getCategories':
                     await this.handleGetCategories();
                     break;
@@ -120,6 +126,28 @@ export class SmartCopilotPanel {
             });
         } catch (error) {
             vscode.window.showErrorMessage(`Error searching prompts: ${error}`);
+        }
+    }
+
+    private async handleSearchKnowledge(query: string, spaceKey?: string) {
+        try {
+            const results = await this.promptSearchService.searchKnowledge(query, spaceKey);
+            this._panel?.webview.postMessage({
+                type: 'knowledgeSearchResults',
+                results
+            });
+        } catch (error) {
+            vscode.window.showErrorMessage(`Error searching knowledge: ${error}`);
+        }
+    }
+
+    private async handleUseKnowledge(knowledge: any) {
+        try {
+            // Copy knowledge text to clipboard
+            await vscode.env.clipboard.writeText(knowledge.chunk_text);
+            vscode.window.showInformationMessage(`Knowledge copied to clipboard: ${knowledge.page_title}`);
+        } catch (error) {
+            vscode.window.showErrorMessage(`Error using knowledge: ${error}`);
         }
     }
 

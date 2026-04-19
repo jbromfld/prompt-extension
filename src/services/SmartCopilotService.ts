@@ -1,370 +1,165 @@
 import * as vscode from 'vscode';
 import { UserSettingsManager } from './UserSettingsManager';
 
-export interface SmartCopilotConfig {
-    serviceUrl: string;
-    apiKey?: string;
+export interface PromptApiItem {
+  id: string;
+  category: string;
+  title: string;
+  body: string;
+  usage_count: number;
+  final_score: number;
 }
 
-export interface SimilarCase {
-    id: string;
-    title: string;
-    description: string;
-    solution: string;
-    error_type: string;
-    tags: string[];
-    similarity: number;
+interface PromptSearchResponse {
+  query: string;
+  count: number;
+  prompts: PromptApiItem[];
 }
 
-export interface ParsedError {
-    type: string;
-    error_message: string;
-    file?: string;
-    line?: number;
-    column?: number;
-    stack_trace?: string;
-    severity: string;
-    raw_error: string;
+interface CategoriesResponse {
+  categories: string[];
 }
 
-export interface ErrorContext {
-    parsed_error: ParsedError;
-    similar_cases: SimilarCase[];
-    logs: string;
-    suggestions: string[];
+interface PromptUsageResponse {
+  ok: boolean;
+  prompt_id: string;
+  usage_count: number;
+}
+
+interface PromptRatingResponse {
+  ok: boolean;
+  prompt_id: string;
+  rating: number;
+  rating_count: number;
+  average_rating: number;
+}
+
+export interface PromptServiceConfig {
+  serviceUrl: string;
+  apiKey?: string;
 }
 
 export class SmartCopilotService {
-    private config: SmartCopilotConfig;
+  private config: PromptServiceConfig;
 
-    constructor() {
-        this.config = this.loadConfig();
+  constructor() {
+    this.config = this.loadConfig();
+  }
+
+  private loadConfig(): PromptServiceConfig {
+    const workspaceConfig = vscode.workspace.getConfiguration('smartCopilot');
+    const configuredUrl = workspaceConfig.get<string>('promptService.url', 'http://127.0.0.1:8090');
+
+    return {
+      serviceUrl: process.env.PROMPT_SERVICE_URL || configuredUrl,
+      apiKey: process.env.PROMPT_SERVICE_API_KEY
+    };
+  }
+
+  private baseUrl(path: string): string {
+    const normalized = this.config.serviceUrl.endsWith('/')
+      ? this.config.serviceUrl.slice(0, -1)
+      : this.config.serviceUrl;
+    return `${normalized}${path}`;
+  }
+
+  private async makeRequest<T>(
+    endpoint: string,
+    method: 'GET' | 'POST' = 'GET',
+    body?: unknown
+  ): Promise<T> {
+    const requestUrl = this.baseUrl(endpoint);
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json'
+    };
+
+    if (this.config.apiKey) {
+      headers['Authorization'] = `Bearer ${this.config.apiKey}`;
     }
 
-    private loadConfig(): SmartCopilotConfig {
-        // Service URL can be configured via environment variable or use default
-        const serviceUrl = process.env.SMART_COPILOT_SERVICE_URL || 'http://127.0.0.1:8000';
-        const apiKey = process.env.SMART_COPILOT_API_KEY;
-
-        return {
-            serviceUrl,
-            apiKey
-        };
+    const userId = UserSettingsManager.getUserId();
+    if (userId) {
+      headers['X-User-ID'] = userId;
     }
 
-    private async makeRequest<T>(endpoint: string, data?: any, method: string = 'GET'): Promise<T> {
-        const url = `${this.config.serviceUrl}${endpoint}`;
+    const response = await fetch(requestUrl, {
+      method,
+      headers,
+      body: body === undefined ? undefined : JSON.stringify(body)
+    });
 
-        const headers: Record<string, string> = {
-            'Content-Type': 'application/json'
-        };
-
-        // Add authentication headers if API key is provided
-        if (this.config.apiKey) {
-            headers['Authorization'] = `Bearer ${this.config.apiKey}`;
+    if (!response.ok) {
+      let detail = '';
+      try {
+        const responseBody = await response.text();
+        if (responseBody) {
+          detail = ` - ${responseBody}`;
         }
+      } catch {
+        // Best-effort only. Keep the original status text if body parsing fails.
+      }
 
-        // Add user context for team features
-        const userSettings = UserSettingsManager.getUserSettings();
-        if (userSettings.userId) {
-            headers['X-User-ID'] = userSettings.userId;
-            if (userSettings.teamId) {
-                headers['X-Team-ID'] = userSettings.teamId;
-            }
-            if (userSettings.personalAccessToken) {
-                headers['X-Personal-Token'] = userSettings.personalAccessToken;
-            }
-        }
-
-        try {
-            const requestOptions: RequestInit = {
-                method: method,
-                headers
-            };
-
-            // Only include body for methods that support it
-            if (data && method !== 'GET' && method !== 'HEAD') {
-                requestOptions.body = JSON.stringify(data);
-            }
-
-            const response = await fetch(url, requestOptions);
-
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-
-            return await response.json();
-        } catch (error) {
-            console.error(`Smart Copilot Service request failed: ${error}`);
-            throw error;
-        }
+      throw new Error(`HTTP ${response.status}: ${response.statusText} (${requestUrl})${detail}`);
     }
 
-    async searchSimilarCases(query: string, limit: number = 5): Promise<SimilarCase[]> {
-        try {
-            const response = await this.makeRequest<{ results: SimilarCase[] }>(
-                '/api/search/similar-cases',
-                { query, limit },
-                'POST'
-            );
-            return response.results;
-        } catch (error) {
-            console.error('Error searching similar cases:', error);
-            return [];
-        }
+    return response.json() as Promise<T>;
+  }
+
+  async checkServiceHealth(): Promise<boolean> {
+    try {
+      await this.makeRequest('/health');
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async getCategories(): Promise<string[]> {
+    const response = await this.makeRequest<CategoriesResponse>('/categories');
+    return response.categories;
+  }
+
+  async searchPrompts(query: string, limit = 20, category?: string): Promise<PromptApiItem[]> {
+    const params = new URLSearchParams();
+    params.set('q', query);
+    params.set('limit', String(limit));
+    if (category) {
+      params.set('category', category);
     }
 
-    async processErrorContext(context: any): Promise<ErrorContext> {
-        try {
-            return await this.makeRequest<ErrorContext>(
-                '/api/process/error-context',
-                { context },
-                'POST'
-            );
-        } catch (error) {
-            console.error('Error processing error context:', error);
-            throw error;
-        }
+    const response = await this.makeRequest<PromptSearchResponse>(`/prompts/search?${params.toString()}`);
+    return response.prompts;
+  }
+
+  async getPopularPrompts(limit = 20, category?: string): Promise<PromptApiItem[]> {
+    const params = new URLSearchParams();
+    params.set('limit', String(limit));
+    if (category) {
+      params.set('category', category);
     }
 
-    async enhancePrompt(prompt: string, context: any): Promise<string> {
-        try {
-            const response = await this.makeRequest<{ enhanced_prompt: string }>(
-                '/api/enhance/prompt',
-                { prompt, context },
-                'POST'
-            );
-            return response.enhanced_prompt;
-        } catch (error) {
-            console.error('Error enhancing prompt:', error);
-            return prompt; // Return original prompt on error
-        }
+    const response = await this.makeRequest<PromptSearchResponse>(`/prompts/popular?${params.toString()}`);
+    return response.prompts;
+  }
+
+  async usePrompt(promptId: string): Promise<PromptUsageResponse> {
+    const userId = UserSettingsManager.getUserId();
+    return this.makeRequest<PromptUsageResponse>('/prompts/usage', 'POST', {
+      prompt_id: promptId,
+      source: 'extension-panel',
+      actor: userId || null,
+      context: { client: 'smart-copilot-assistant' }
+    });
+  }
+
+  async ratePrompt(promptId: string, rating: number): Promise<PromptRatingResponse> {
+    const userId = UserSettingsManager.getUserId();
+    const params = new URLSearchParams();
+    params.set('rating', String(rating));
+    if (userId) {
+      params.set('actor', userId);
     }
 
-    async searchPrompts(query: string, type?: string, limit: number = 20): Promise<any[]> {
-        try {
-            // Use the autocomplete endpoint for search
-            const response = await this.autocompleteSearch(query, limit);
-            return response.results || [];
-        } catch (error) {
-            console.error('Error searching prompts:', error);
-            return [];
-        }
-    }
-
-    async searchKnowledge(query: string, spaceKey?: string, limit: number = 10): Promise<any[]> {
-        try {
-            const url = new URL('/search/knowledge', this.config.serviceUrl);
-            url.searchParams.set('q', query);
-            if (spaceKey) {
-                url.searchParams.set('space_key', spaceKey);
-            }
-            url.searchParams.set('limit', limit.toString());
-
-            const response = await fetch(url.toString(), {
-                method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...(this.config.apiKey && { 'Authorization': `Bearer ${this.config.apiKey}` })
-                }
-            });
-
-            if (!response.ok) {
-                throw new Error(`Knowledge search failed: ${response.statusText}`);
-            }
-
-            const data = await response.json();
-            return data.results || [];
-        } catch (error) {
-            console.error('Error searching knowledge:', error);
-            return [];
-        }
-    }
-
-    async autocompleteSearch(query: string, limit: number = 10): Promise<any> {
-        try {
-            // Don't call the endpoint if query is empty
-            if (!query || query.trim().length === 0) {
-                return { results: [], query: '', category_filter: null };
-            }
-
-            const response = await this.makeRequest<any>(
-                `/search/autocomplete?q=${encodeURIComponent(query.trim())}&limit=${limit}`
-            );
-            return response;
-        } catch (error) {
-            console.error('Error in autocomplete search:', error);
-            return { results: [], query, category_filter: null };
-        }
-    }
-
-    async getTeamEvents(teamId: string, limit: number = 50): Promise<any[]> {
-        try {
-            const response = await this.makeRequest<{ events: any[] }>(
-                '/api/team/events',
-                { team_id: teamId, limit },
-                'POST'
-            );
-            return response.events;
-        } catch (error) {
-            console.error('Error getting team events:', error);
-            return [];
-        }
-    }
-
-    async usePrompt(promptId: string): Promise<void> {
-        try {
-            await this.makeRequest(
-                `/prompts/${promptId}/use`,
-                'POST'
-            );
-            console.log(`Prompt usage tracked: ${promptId}`);
-        } catch (error) {
-            console.error('Error tracking prompt usage:', error);
-            // Don't throw error - this is not critical
-        }
-    }
-
-    async ratePrompt(promptId: string, rating: number): Promise<void> {
-        try {
-            await this.makeRequest(
-                `/prompts/${promptId}/rate?rating=${rating}`,
-                'POST'
-            );
-            console.log(`Prompt rated: ${promptId} - ${rating} stars`);
-        } catch (error) {
-            console.error('Error rating prompt:', error);
-            throw error; // Rating is more important than usage tracking
-        }
-    }
-
-    async getCategories(): Promise<any[]> {
-        try {
-            const response = await this.makeRequest<{ categories: any[] }>(
-                '/categories'
-            );
-            return response.categories;
-        } catch (error) {
-            console.error('Error getting categories:', error);
-            return [];
-        }
-    }
-
-    async getTeams(): Promise<any[]> {
-        try {
-            const response = await this.makeRequest<{ teams: any[] }>(
-                '/api/teams'
-            );
-            return response.teams;
-        } catch (error) {
-            console.error('Error getting teams:', error);
-            return [];
-        }
-    }
-
-    async getDeployEvents(teamId: number, limit: number = 50): Promise<any[]> {
-        try {
-            const response = await this.makeRequest<{ events: any[] }>(
-                '/api/team/deploy-events',
-                { team_id: teamId, limit },
-                'POST'
-            );
-            return response.events;
-        } catch (error) {
-            console.error('Error getting deploy events:', error);
-            return [];
-        }
-    }
-
-    async getTestEvents(teamId: number, limit: number = 50): Promise<any[]> {
-        try {
-            const response = await this.makeRequest<{ events: any[] }>(
-                '/api/team/test-events',
-                { team_id: teamId, limit },
-                'POST'
-            );
-            return response.events;
-        } catch (error) {
-            console.error('Error getting test events:', error);
-            return [];
-        }
-    }
-
-    async getFailureEvents(teamId: number, limit: number = 50): Promise<any[]> {
-        try {
-            const response = await this.makeRequest<{ events: any[] }>(
-                '/api/team/failure-events',
-                { team_id: teamId, limit },
-                'POST'
-            );
-            return response.events;
-        } catch (error) {
-            console.error('Error getting failure events:', error);
-            return [];
-        }
-    }
-
-    async checkServiceHealth(): Promise<boolean> {
-        try {
-            await this.makeRequest('/health');
-            return true;
-        } catch (error) {
-            return false;
-        }
-    }
-
-    async installLocalService(): Promise<void> {
-        // Check if smart-copilot-service is installed
-        const { spawn } = require('child_process');
-
-        return new Promise((resolve, reject) => {
-            const pip = spawn('pip', ['show', 'smart-copilot-service'], { stdio: 'pipe' });
-
-            pip.on('close', (code: number) => {
-                if (code === 0) {
-                    // Package is already installed
-                    resolve();
-                } else {
-                    // Package not installed, try to install it
-                    const install = spawn('pip', ['install', 'smart-copilot-service'], { stdio: 'pipe' });
-
-                    install.on('close', (installCode: number) => {
-                        if (installCode === 0) {
-                            resolve();
-                        } else {
-                            reject(new Error('Failed to install smart-copilot-service'));
-                        }
-                    });
-
-                    install.on('error', reject);
-                }
-            });
-
-            pip.on('error', reject);
-        });
-    }
-
-    async startLocalService(): Promise<void> {
-        const { spawn } = require('child_process');
-
-        return new Promise((resolve, reject) => {
-            const service = spawn('smart-copilot-service', [], {
-                stdio: 'pipe',
-                detached: false
-            });
-
-            // Wait for service to be ready
-            setTimeout(() => {
-                this.checkServiceHealth().then(healthy => {
-                    if (healthy) {
-                        resolve();
-                    } else {
-                        reject(new Error('Service failed to start'));
-                    }
-                });
-            }, 3000);
-
-            service.on('error', reject);
-        });
-    }
+    return this.makeRequest<PromptRatingResponse>(`/prompts/${encodeURIComponent(promptId)}/rate?${params.toString()}`, 'POST');
+  }
 }

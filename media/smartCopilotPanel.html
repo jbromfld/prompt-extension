@@ -172,7 +172,6 @@
 
         <div class="row">
             <button id="insertButton">Insert Into Copilot Chat</button>
-            <button id="settingsButton">Settings</button>
         </div>
 
         <div id="promptList" class="list"></div>
@@ -192,7 +191,6 @@
             const categoryFilter = document.getElementById('categoryFilter');
             const searchInput = document.getElementById('searchInput');
             const insertButton = document.getElementById('insertButton');
-            const settingsButton = document.getElementById('settingsButton');
             const promptList = document.getElementById('promptList');
             const message = document.getElementById('message');
             const ratingSection = document.getElementById('ratingSection');
@@ -308,10 +306,6 @@
                     prompt: selectedPrompt.prompt,
                     ratingPrompt: selectedPrompt
                 });
-            });
-
-            settingsButton.addEventListener('click', () => {
-                vscode.postMessage({ type: 'openSettings' });
             });
 
             submitRating.addEventListener('click', () => {

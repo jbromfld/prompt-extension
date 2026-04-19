@@ -2,21 +2,14 @@
 
 Prompt-library-first VS Code extension for GitHub Copilot.
 
-This extension now has a single responsibility:
-- Search prompt templates
-- Insert selected prompts into Copilot Chat
-- Submit 1-5 feedback ratings per prompt
-
-It no longer depends on `smart-copilot-service`.
-
 ## Architecture
 
 Microservice boundary:
-- `smart-copilot-assistant` (VS Code extension UI and Copilot insertion)
+- `prompt-extension` (VS Code extension UI and Copilot insertion)
 - `prompt-service` (prompt search, categories, usage, feedback)
 
 ```text
-VS Code Extension (smart-copilot-assistant)
+VS Code Extension (prompt-extension)
   -> HTTP API calls
 prompt-service (prompt + feedback)
   -> PostgreSQL

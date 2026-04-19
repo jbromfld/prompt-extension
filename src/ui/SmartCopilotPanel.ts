@@ -1,324 +1,142 @@
 import * as vscode from 'vscode';
-import * as path from 'path';
 import * as fs from 'fs';
+import * as path from 'path';
 import { PromptSearchService } from '../services/PromptSearchService';
-import { TeamEventService } from '../services/TeamEventService';
-import { SmartCopilotService } from '../services/SmartCopilotService';
 
 export class SmartCopilotPanel {
-    private panel: vscode.WebviewPanel | undefined;
-    private disposables: vscode.Disposable[] = [];
+  public static currentPanel: SmartCopilotPanel | undefined;
 
-    constructor(
-        private context: vscode.ExtensionContext,
-        private promptSearchService: PromptSearchService,
-        private teamEventService: TeamEventService,
-        private smartCopilotService: SmartCopilotService
-    ) { }
+  private readonly panel: vscode.WebviewPanel;
+  private readonly extensionUri: vscode.Uri;
+  private readonly promptSearchService: PromptSearchService;
 
-    public show() {
-        if (this.panel) {
-            this.panel.reveal();
-            return;
-        }
+  public static createOrShow(extensionUri: vscode.Uri, promptSearchService: PromptSearchService): void {
+    const column = vscode.ViewColumn.Beside;
 
-        this.panel = vscode.window.createWebviewPanel(
-            'smartCopilotPanel',
-            'Smart Copilot Assistant',
-            vscode.ViewColumn.Beside, // Open beside current editor
-            {
-                enableScripts: true,
-                retainContextWhenHidden: true,
-                localResourceRoots: [
-                    vscode.Uri.file(path.join(this.context.extensionPath, 'media'))
-                ]
-            }
-        );
-
-        this.panel.webview.html = this.getWebviewContent();
-
-        // Handle messages from webview
-        this.panel.webview.onDidReceiveMessage(
-            async (message) => {
-                switch (message.type) {
-                    case 'searchPrompts':
-                        await this.handleSearchPrompts(message.query, message.categoryId);
-                        break;
-                    case 'getCategories':
-                        await this.handleGetCategories();
-                        break;
-                    case 'updateCache':
-                        await this.handleUpdateCache();
-                        break;
-                    case 'clearCache':
-                        await this.handleClearCache();
-                        break;
-                    case 'getCacheInfo':
-                        await this.handleGetCacheInfo();
-                        break;
-                    case 'selectPrompt':
-                        await this.handleSelectPrompt(message.promptId);
-                        break;
-                    case 'sendToCopilot':
-                        await this.handleSendToCopilot(message.prompt);
-                        break;
-                    case 'loadTeamEvents':
-                        await this.handleLoadTeamEvents();
-                        break;
-                    case 'remediateEvent':
-                        await this.handleRemediateEvent(message.eventId);
-                        break;
-                    case 'syncCache':
-                        await this.handleSyncCache();
-                        break;
-                }
-            },
-            undefined,
-            this.disposables
-        );
-
-        this.panel.onDidDispose(
-            () => {
-                this.panel = undefined;
-                this.dispose();
-            },
-            null,
-            this.disposables
-        );
-
-        // Load initial data
-        this.loadInitialData();
+    if (SmartCopilotPanel.currentPanel) {
+      SmartCopilotPanel.currentPanel.panel.reveal(column);
+      return;
     }
 
-    private async loadInitialData() {
-        const config = vscode.workspace.getConfiguration('smartCopilot');
+    const panel = vscode.window.createWebviewPanel(
+      'smartCopilotPanel',
+      'Smart Copilot Prompt Library',
+      column,
+      {
+        enableScripts: true,
+        localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'media')]
+      }
+    );
 
-        // Send configuration to webview
-        this.panel?.webview.postMessage({
-            type: 'configUpdate',
-            config: {
-                promptSearchEnabled: config.get('features.promptSearch'),
-                teamEventsEnabled: config.get('features.teamEvents'),
-                userId: config.get('user.id'),
-                teamId: config.get('user.teamId')
-            }
-        });
+    SmartCopilotPanel.currentPanel = new SmartCopilotPanel(panel, extensionUri, promptSearchService);
+  }
 
-        // Load team events if enabled
-        if (config.get('features.teamEvents') && config.get('user.teamId')) {
-            await this.handleLoadTeamEvents();
-        }
+  private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri, promptSearchService: PromptSearchService) {
+    this.panel = panel;
+    this.extensionUri = extensionUri;
+    this.promptSearchService = promptSearchService;
+
+    this.panel.webview.html = this.getWebviewContent();
+    this.panel.onDidDispose(() => this.dispose(), null);
+
+    this.panel.webview.onDidReceiveMessage(async (message: { type: string; [key: string]: unknown }) => {
+      switch (message.type) {
+        case 'getCategories':
+          await this.handleGetCategories();
+          break;
+        case 'searchPrompts':
+          await this.handleSearchPrompts(
+            typeof message.query === 'string' ? message.query : '',
+            typeof message.categoryId === 'string' && message.categoryId ? parseInt(message.categoryId, 10) : undefined
+          );
+          break;
+        case 'selectPrompt':
+          if (typeof message.promptId === 'string') {
+            await this.promptSearchService.usePrompt(message.promptId);
+          }
+          break;
+        case 'sendToCopilot':
+          await this.handleSendToCopilot(
+            typeof message.prompt === 'string' ? message.prompt : '',
+            message.ratingPrompt
+          );
+          break;
+        case 'submitRating':
+          if (typeof message.promptId === 'string' && typeof message.rating === 'number') {
+            await this.handleSubmitRating(message.promptId, message.rating);
+          }
+          break;
+      }
+    });
+
+    void this.handleGetCategories();
+    void this.handleSearchPrompts('', undefined);
+  }
+
+  private async handleGetCategories(): Promise<void> {
+    const categories = await this.promptSearchService.getCategories();
+    this.panel.webview.postMessage({ type: 'categoriesLoaded', categories });
+  }
+
+  private async handleSearchPrompts(query: string, categoryId?: number): Promise<void> {
+    const prompts = await this.promptSearchService.searchPrompts(query, categoryId);
+    this.panel.webview.postMessage({ type: 'promptSearchResults', prompts });
+  }
+
+  private async handleSendToCopilot(prompt: string, ratingPrompt: unknown): Promise<void> {
+    try {
+      await vscode.commands.executeCommand('workbench.action.chat.open');
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await vscode.commands.executeCommand('workbench.panel.chat.view.copilot.focus');
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      await vscode.env.clipboard.writeText(prompt);
+      await vscode.commands.executeCommand('editor.action.clipboardPasteAction');
+
+      this.panel.webview.postMessage({
+        type: 'showMessage',
+        message: 'Prompt inserted into Copilot Chat.',
+        messageType: 'success'
+      });
+
+      this.panel.webview.postMessage({
+        type: 'showRatingPrompt',
+        prompt: ratingPrompt
+      });
+    } catch {
+      await vscode.env.clipboard.writeText(prompt);
+      this.panel.webview.postMessage({
+        type: 'showMessage',
+        message: 'Prompt copied to clipboard. Paste it into Copilot Chat.',
+        messageType: 'info'
+      });
     }
+  }
 
-    private async handleSearchPrompts(query: string, categoryId?: string) {
-        try {
-            const prompts = await this.promptSearchService.searchPrompts(query, categoryId);
-            this.panel?.webview.postMessage({
-                type: 'promptSearchResults',
-                prompts
-            });
-        } catch (error) {
-            vscode.window.showErrorMessage(`Error searching prompts: ${error}`);
-        }
+  private async handleSubmitRating(promptId: string, rating: number): Promise<void> {
+    try {
+      await this.promptSearchService.ratePrompt(promptId, rating);
+      this.panel.webview.postMessage({
+        type: 'showMessage',
+        message: 'Rating submitted. Thank you for your feedback.',
+        messageType: 'success'
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.panel.webview.postMessage({
+        type: 'showMessage',
+        message: `Rating failed: ${message}`,
+        messageType: 'error'
+      });
     }
+  }
 
-    private async handleGetCategories() {
-        try {
-            const categories = await this.promptSearchService.getCategories();
-            this.panel?.webview.postMessage({
-                type: 'categoriesLoaded',
-                categories
-            });
-        } catch (error) {
-            vscode.window.showErrorMessage(`Error loading categories: ${error}`);
-        }
-    }
+  private getWebviewContent(): string {
+    const htmlPath = path.join(this.extensionUri.fsPath, 'media', 'smartCopilotPanel.html');
+    return fs.readFileSync(htmlPath, 'utf8');
+  }
 
-    private async handleUpdateCache() {
-        try {
-            vscode.window.showInformationMessage('Updating cache...');
-            await this.promptSearchService.updateCache();
-            vscode.window.showInformationMessage('✅ Cache updated successfully!');
-
-            // Refresh categories after cache update
-            await this.handleGetCategories();
-        } catch (error) {
-            vscode.window.showErrorMessage(`Failed to update cache: ${error}`);
-        }
-    }
-
-    private async handleClearCache() {
-        try {
-            const result = await vscode.window.showWarningMessage(
-                'Are you sure you want to clear the cache? This will require re-downloading all data.',
-                'Yes', 'No'
-            );
-
-            if (result === 'Yes') {
-                await this.promptSearchService.clearCache();
-                vscode.window.showInformationMessage('✅ Cache cleared successfully!');
-
-                // Refresh categories after cache clear
-                await this.handleGetCategories();
-            }
-        } catch (error) {
-            vscode.window.showErrorMessage(`Failed to clear cache: ${error}`);
-        }
-    }
-
-    private async handleGetCacheInfo() {
-        try {
-            const cacheInfo = await this.promptSearchService.getCacheInfo();
-            this.panel?.webview.postMessage({
-                type: 'cacheInfoLoaded',
-                cacheInfo
-            });
-        } catch (error) {
-            console.error('Error getting cache info:', error);
-        }
-    }
-
-    private async handleSelectPrompt(promptId: string) {
-        try {
-            // Track usage
-            await this.promptSearchService.usePrompt(promptId);
-
-            this.panel?.webview.postMessage({
-                type: 'promptSelected',
-                promptId
-            });
-        } catch (error) {
-            console.error('Error selecting prompt:', error);
-        }
-    }
-
-
-    private async handleSendToCopilot(prompt: string) {
-        try {
-            // Try to open Copilot chat
-            try {
-                await vscode.commands.executeCommand('github.copilot.interactiveSession.focus');
-
-                // Wait a moment for the chat to open
-                await new Promise(resolve => setTimeout(resolve, 1000));
-
-                // Copy to clipboard first
-                await vscode.env.clipboard.writeText(prompt);
-
-                // Try to paste into the chat
-                await vscode.commands.executeCommand('editor.action.clipboardPasteAction');
-
-                // Send success message to webview
-                this.panel?.webview.postMessage({
-                    type: 'copilotSent'
-                });
-
-            } catch (copilotError) {
-                console.error('Error opening Copilot chat:', copilotError);
-
-                // Fallback: copy to clipboard and show message
-                await vscode.env.clipboard.writeText(prompt);
-                vscode.window.showInformationMessage('📋 Prompts copied to clipboard. Paste them in Copilot chat manually.');
-
-                // Send success message to webview
-                this.panel?.webview.postMessage({
-                    type: 'copilotSent'
-                });
-            }
-        } catch (error) {
-            console.error('Error sending to Copilot:', error);
-            vscode.window.showErrorMessage('Could not send to Copilot. Prompts copied to clipboard.');
-            await vscode.env.clipboard.writeText(prompt);
-        }
-    }
-
-    private async handleLoadTeamEvents() {
-        try {
-            const config = vscode.workspace.getConfiguration('smartCopilot');
-            const teamId = config.get<string>('user.teamId');
-
-            if (!teamId) {
-                vscode.window.showWarningMessage('Team ID not configured');
-                return;
-            }
-
-            const events = await this.teamEventService.getTeamEvents(teamId);
-            this.panel?.webview.postMessage({
-                type: 'teamEventsLoaded',
-                events
-            });
-        } catch (error) {
-            console.error('Error loading team events:', error);
-            vscode.window.showErrorMessage('Failed to load team events');
-        }
-    }
-
-    private async handleRemediateEvent(eventId: string) {
-        try {
-            // Get event context
-            const eventContext = await this.teamEventService.getEventContext(eventId);
-            if (!eventContext) {
-                vscode.window.showErrorMessage('Event context not found');
-                return;
-            }
-
-            // Show loading state
-            this.panel?.webview.postMessage({
-                type: 'remediationStarted',
-                eventId
-            });
-
-            // Process with Smart Copilot service
-            const enhancedContext = await this.smartCopilotService.processErrorContext(eventContext);
-
-            // Create remediation prompt
-            const remediationPrompt = await this.smartCopilotService.enhancePrompt(
-                'Help me fix this error',
-                enhancedContext
-            );
-
-            // Send to webview
-            this.panel?.webview.postMessage({
-                type: 'remediationReady',
-                eventId,
-                prompt: remediationPrompt,
-                context: enhancedContext
-            });
-
-        } catch (error) {
-            console.error('Error processing remediation:', error);
-            vscode.window.showErrorMessage('Failed to process remediation');
-
-            this.panel?.webview.postMessage({
-                type: 'remediationError',
-                eventId,
-                error: error instanceof Error ? error.message : 'Unknown error'
-            });
-        }
-    }
-
-    private async handleSyncCache() {
-        try {
-            // Refresh team events data
-            await this.handleLoadTeamEvents();
-            vscode.window.showInformationMessage('Team events refreshed successfully');
-        } catch (error) {
-            console.error('Error syncing cache:', error);
-            vscode.window.showErrorMessage('Failed to sync cache');
-        }
-    }
-
-    private getWebviewContent(): string {
-        const htmlPath = path.join(this.context.extensionPath, 'src', 'webview', 'smartCopilotPanel.html');
-        return fs.readFileSync(htmlPath, 'utf8');
-    }
-
-    public dispose() {
-        while (this.disposables.length) {
-            const disposable = this.disposables.pop();
-            if (disposable) {
-                disposable.dispose();
-            }
-        }
-    }
+  public dispose(): void {
+    SmartCopilotPanel.currentPanel = undefined;
+    this.panel.dispose();
+  }
 }

@@ -1,7 +1,8 @@
 {
   "name": "smart-copilot-assistant",
+  "publisher": "local",
   "displayName": "Smart Copilot Assistant",
-  "description": "Intelligent prompt suggestions and team collaboration for GitHub Copilot",
+  "description": "Prompt library and feedback assistant for GitHub Copilot",
   "version": "0.1.0",
   "engines": {
     "vscode": "^1.74.0"
@@ -20,61 +21,12 @@
         "smartCopilot.user.id": {
           "type": "string",
           "default": "",
-          "description": "Your user ID for team collaboration (optional)"
+          "description": "Optional user ID for prompt usage and feedback attribution"
         },
-        "smartCopilot.user.teamId": {
+        "smartCopilot.promptService.url": {
           "type": "string",
-          "default": "",
-          "description": "Your team ID for collaboration features (optional)"
-        },
-        "smartCopilot.user.personalAccessToken": {
-          "type": "string",
-          "default": "",
-          "description": "Personal access token for enhanced features (optional)"
-        },
-        "smartCopilot.features.promptSearch": {
-          "type": "boolean",
-          "default": true,
-          "description": "Enable smart prompt search feature"
-        },
-        "smartCopilot.features.teamEvents": {
-          "type": "boolean",
-          "default": true,
-          "description": "Enable team events monitoring"
-        },
-        "smartCopilot.cache.syncInterval": {
-          "type": "number",
-          "default": 24,
-          "description": "Cache sync interval in hours"
-        },
-        "smartCopilot.cache.maxAge": {
-          "type": "number",
-          "default": 24,
-          "description": "Maximum cache age in hours before auto-update"
-        },
-        "smartCopilot.service.type": {
-          "type": "string",
-          "enum": [
-            "local",
-            "serverless"
-          ],
-          "default": "local",
-          "description": "Service type: local Python service or hosted endpoint"
-        },
-        "smartCopilot.service.localUrl": {
-          "type": "string",
-          "default": "http://127.0.0.1:8000",
-          "description": "Local service URL (if running locally)"
-        },
-        "smartCopilot.service.serverlessUrl": {
-          "type": "string",
-          "default": "",
-          "description": "Hosted service URL (if using hosted service)"
-        },
-        "smartCopilot.service.apiKey": {
-          "type": "string",
-          "default": "",
-          "description": "API key for hosted service (if using serverless)"
+          "default": "http://127.0.0.1:8090",
+          "description": "Base URL for prompt-service"
         }
       }
     },
@@ -84,20 +36,8 @@
         "title": "Smart Copilot Assistant: Open Panel"
       },
       {
-        "command": "smartCopilot.syncCache",
-        "title": "Sync Team Events Cache"
-      },
-      {
-        "command": "smartCopilot.clearCache",
-        "title": "Clear Local Cache"
-      },
-      {
         "command": "smartCopilot.showConfiguration",
         "title": "Show Configuration Status"
-      },
-      {
-        "command": "smartCopilot.openSettings",
-        "title": "Open Smart Copilot Settings"
       }
     ],
     "menus": {
@@ -107,19 +47,7 @@
           "when": "true"
         },
         {
-          "command": "smartCopilot.syncCache",
-          "when": "true"
-        },
-        {
-          "command": "smartCopilot.clearCache",
-          "when": "true"
-        },
-        {
           "command": "smartCopilot.showConfiguration",
-          "when": "true"
-        },
-        {
-          "command": "smartCopilot.openSettings",
           "when": "true"
         }
       ]
@@ -128,15 +56,21 @@
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./"
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package --allow-missing-repository --skip-license",
+    "vsix:build": "npm run compile && npm run package",
+    "install:service": "./install-service.sh",
+    "install:local": "./install.sh"
   },
   "devDependencies": {
+    "@vscode/vsce": "2.24.0",
     "@types/node": "16.x",
-    "@types/pg": "^8.10.0",
     "@types/vscode": "^1.74.0",
     "typescript": "^4.9.4"
   },
-  "dependencies": {
-    "pg": "^8.11.0"
+  "dependencies": {},
+  "overrides": {
+    "cheerio": "1.0.0-rc.12",
+    "undici": "5.28.5"
   }
 }

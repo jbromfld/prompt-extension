@@ -1,116 +1,55 @@
 import * as vscode from 'vscode';
 import { SmartCopilotService } from './services/SmartCopilotService';
 import { SmartCopilotPanel } from './ui/SmartCopilotPanel';
-import { DatabaseService } from './services/DatabaseService';
-import { TeamEventService } from './services/TeamEventService';
 import { PromptSearchService } from './services/PromptSearchService';
 import { UserSettingsManager } from './services/UserSettingsManager';
 
 export async function activate(context: vscode.ExtensionContext) {
-  console.log('Smart Copilot Assistant is now active!');
-
   try {
-    // Check configuration and show help if needed
     if (!UserSettingsManager.hasBasicConfiguration()) {
-      // Show a one-time help message for new users
-      const showHelp = context.globalState.get('smart-copilot-showed-help', false);
-      if (!showHelp) {
+      const shown = context.globalState.get<boolean>('smart-copilot-showed-help', false);
+      if (!shown) {
         setTimeout(() => {
           UserSettingsManager.showConfigurationHelp();
-          context.globalState.update('smart-copilot-showed-help', true);
-        }, 2000); // Show after 2 seconds to let extension load
+          void context.globalState.update('smart-copilot-showed-help', true);
+        }, 1500);
       }
     }
 
-    // Initialize Smart Copilot service
-    const smartCopilotService = new SmartCopilotService();
+    const promptApi = new SmartCopilotService();
+    const promptSearchService = new PromptSearchService(promptApi);
 
-    // Check if service is available
-    const serviceHealthy = await smartCopilotService.checkServiceHealth();
-    if (!serviceHealthy) {
-      console.warn('Smart Copilot service not available, some features may be limited');
-    }
+    // Keep startup non-blocking so the view provider is always ready in debug mode.
+    void promptApi.checkServiceHealth().then((healthy) => {
+      if (!healthy) {
+        vscode.window.showWarningMessage('Prompt service is unavailable. Prompt library features may fail until it is reachable.');
+      }
+    });
 
-    // Initialize services
-    const databaseService = new DatabaseService(context);
-    const teamEventService = new TeamEventService(databaseService);
-    const promptSearchService = new PromptSearchService(databaseService, smartCopilotService);
-
-    // Initialize UI
-    const panel = new SmartCopilotPanel(
-      context,
-      promptSearchService,
-      teamEventService,
-      smartCopilotService
-    );
-
-    // Create status bar item
     const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
-    statusBarItem.text = "$(robot) Smart Copilot";
+    statusBarItem.text = '$(book) Prompt Library';
     statusBarItem.command = 'smartCopilot.openPanel';
-    statusBarItem.tooltip = 'Open Smart Copilot Assistant (Extension Panel)';
+    statusBarItem.tooltip = 'Open Smart Copilot Prompt Library';
     statusBarItem.show();
 
-    // Register commands
-    const openPanelCommand = vscode.commands.registerCommand(
-      'smartCopilot.openPanel',
-      () => panel.show()
-    );
-
-    const syncCacheCommand = vscode.commands.registerCommand(
-      'smartCopilot.syncCache',
-      () => {
-        // Refresh team events data
-        teamEventService.getTeamEvents('').then(() => {
-          vscode.window.showInformationMessage('Team events refreshed successfully');
-        }).catch(error => {
-          console.error('Error syncing cache:', error);
-          vscode.window.showErrorMessage('Failed to sync cache');
-        });
-      }
-    );
-
-    const clearCacheCommand = vscode.commands.registerCommand(
-      'smartCopilot.clearCache',
-      () => promptSearchService.clearCache()
-    );
+    const openPanelCommand = vscode.commands.registerCommand('smartCopilot.openPanel', () => {
+      SmartCopilotPanel.createOrShow(context.extensionUri, promptSearchService);
+    });
 
     const showConfigurationCommand = vscode.commands.registerCommand(
       'smartCopilot.showConfiguration',
       () => UserSettingsManager.showConfigurationStatus()
     );
 
-    const openSettingsCommand = vscode.commands.registerCommand(
-      'smartCopilot.openSettings',
-      () => UserSettingsManager.openSettings()
-    );
-
-    // Setup periodic cache sync
-    const syncInterval = vscode.workspace.getConfiguration('smartCopilot').get('cache.syncInterval', 24) * 60 * 60 * 1000;
-    const syncTimer = setInterval(() => {
-      if (vscode.workspace.getConfiguration('smartCopilot').get('features.teamEvents')) {
-        // Refresh team events data periodically
-        teamEventService.getTeamEvents('').catch(error => {
-          console.error('Periodic sync failed:', error);
-        });
-      }
-    }, syncInterval);
-
     context.subscriptions.push(
       openPanelCommand,
-      syncCacheCommand,
-      clearCacheCommand,
       showConfigurationCommand,
-      openSettingsCommand,
-      statusBarItem,
-      { dispose: () => clearInterval(syncTimer) }
+      statusBarItem
     );
-
-    console.log('Smart Copilot Assistant initialized successfully!');
   } catch (error) {
-    console.error('Failed to activate Smart Copilot Assistant:', error);
-    vscode.window.showErrorMessage(`Smart Copilot Assistant failed to start: ${error}`);
+    const message = error instanceof Error ? error.message : String(error);
+    vscode.window.showErrorMessage(`Smart Copilot Assistant failed to start: ${message}`);
   }
 }
 
-export function deactivate() { }
+export function deactivate() {}
